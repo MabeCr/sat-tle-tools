@@ -3,6 +3,7 @@
 // The page: connect to the radio over Web Serial, set its clock, list and update its satellites, read diagnostics.
 // All of the radio and TLE logic is in lib/ (tested in Node against a fake radio); this file only wires it to the DOM.
 import { Link, LinkError } from "./lib/link.js";
+import { FtdiStream, errorText as usbErrorText, usbSupported } from "./lib/ftdi.js";
 import { SerialStream, errorText, serialSupported } from "./lib/serial.js";
 import * as sat from "./lib/sat.js";
 import { SAT_TLE_URL, compare, parse } from "./lib/tle.js";
@@ -13,6 +14,8 @@ const CACHE_MS = 2 * 3600 * 1000;	// CelesTrak asks for a group no more often th
 const MIN_CLOCK = Date.UTC(2026, 0, 1) / 1000;	// the radio refuses a time before this too
 
 let link = null, stream = null;
+let how = "serial";		// how the radio is connected: "serial" (Web Serial) or "usb" (an FTDI cable over WebUSB)
+const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 let stored = [];		// the radio's list, as sat.list gives it
 let tles = new Map();		// the element sets read from the source
 const added = new Set();	// catalog numbers to store that the radio doesn't hold yet
@@ -29,7 +32,7 @@ async function run(btn, msg, fn) {
 	try {
 		await fn();
 	} catch (e) {
-		const text = e instanceof LinkError ? (/no answer/.test(e.message) ? "The radio did not answer. Is it on, with the cable in, and not in a menu that holds the port?" : e.message) : errorText(e);
+		const text = e instanceof LinkError ? (/no answer/.test(e.message) ? "The radio did not answer. Is it on, with the cable in, and not in a menu that holds the port?" : e.message) : (how === "usb" ? usbErrorText : errorText)(e);
 		say(msg, text, "bad");
 		if (e?.name === "NetworkError" || stream?.lost) await disconnect();
 	} finally {
@@ -46,14 +49,15 @@ const ageDays = (epoch) => (Date.now() / 1000 - epoch) / 86400;
 function show(connected) {
 	for (const id of ["clock", "stored", "update", "diag"]) $(id).hidden = !connected;
 	$("connect-btn").hidden = connected;
-	$("connect-known-btn").hidden = connected;
+	$("connect-alt-btn").hidden = connected || $("connect-alt-btn").dataset.none === "1";
 	$("disconnect-btn").hidden = !connected;
 }
 
-async function connect(onlyKnown = false) {
+async function connect(method) {
 	$("connect-help").hidden = true;
+	how = method;
 	try {
-		stream = await SerialStream.choose({ onlyKnown });
+		stream = method === "usb" ? await FtdiStream.choose() : await SerialStream.choose();
 	} catch (e) {
 		if (e?.name === "NotFoundError") $("connect-help").hidden = false;	// the chooser closed with nothing chosen (or listed)
 		throw e;
@@ -326,11 +330,16 @@ async function diagnostics() {
 // --- start ---
 
 function init() {
-	if (!serialSupported()) $("unsupported").hidden = false;
+	if (!serialSupported() && !usbSupported()) $("unsupported").hidden = false;
 	tickPhone();
 	setInterval(tickPhone, 1000);
-	$("connect-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(false)));
-	$("connect-known-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(true)));
+	// A phone sees an FTDI cable only through WebUSB; a computer's driver owns it, so Web Serial is the first choice there
+	const first = ANDROID && usbSupported() ? "usb" : "serial", other = first === "usb" ? "serial" : "usb";
+	$("connect-btn").textContent = first === "usb" ? "Connect radio (USB cable)" : "Connect radio";
+	$("connect-alt-btn").textContent = other === "usb" ? "FTDI cable over WebUSB" : "Other serial port";
+	if (other === "usb" ? !usbSupported() : !serialSupported()) $("connect-alt-btn").dataset.none = "1", $("connect-alt-btn").hidden = true;
+	$("connect-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(first)));
+	$("connect-alt-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(other)));
 	$("disconnect-btn").addEventListener("click", disconnect);
 	$("clock-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), setClock));
 	$("stored-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), readStored));
@@ -350,6 +359,7 @@ function init() {
 		try { await navigator.clipboard.writeText($("diag-out").textContent); say($("radio-info"), "Report copied.", "ok"); } catch { say($("radio-info"), "Couldn't copy: select the text instead.", "warn"); }
 	});
 	navigator.serial?.addEventListener("disconnect", () => { if (link) disconnect(); });
+	navigator.usb?.addEventListener("disconnect", () => { if (link && how === "usb") disconnect(); });
 	if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 

@@ -19,6 +19,12 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 5. **Diagnostics**: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
    orbit model's speed. *Copy report* puts it on the clipboard for a bug report.
 
+**Connecting from a phone.** Chrome on Android gives Web Serial only to USB devices of the standard serial class (and to
+Bluetooth serial ports), so an FTDI programming cable doesn't appear in its serial port list. The page therefore talks to
+an FTDI cable (FT232R, FT231X and the like) directly over WebUSB on Android: use **Connect radio (USB cable)**. **Other
+serial port** is the Web Serial list, for cables the phone does list. On a computer, **Connect radio** uses Web Serial
+(the operating system's FTDI driver owns the cable there, so WebUSB can't claim it).
+
 Only one program may hold the serial port at a time: close any other tab or tool using the cable.
 
 ### Run it on a computer
@@ -57,4 +63,5 @@ rules to element sets; change it there, not here.
 | `lib/frame.js`, `lib/link.js` | the radio's debug link: frames, requests, version, view sections |
 | `lib/sat.js` | the SAT command and the update loop (the same rules as `rfoundry_debug.py sat update`) |
 | `lib/serial.js` | Web Serial as a byte stream |
+| `lib/ftdi.js` | an FTDI cable over WebUSB as a byte stream (baud divisor, status bytes, vendor requests) |
 | `test/fakeradio.js` | a radio's debug link in memory |

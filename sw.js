@@ -2,8 +2,8 @@
 // Copyright (c) 2026 The RadioFoundry Authors
 // Keeps the page's own files so it opens with no coverage. The element set download is not cached here: the page
 // keeps the last one itself (app.js). Change CACHE when any file changes.
-const CACHE = "sat-web-3";
-const FILES = ["./", "index.html", "style.css", "app.js", "lib/bytes.js", "lib/frame.js", "lib/link.js", "lib/sat.js", "lib/serial.js",
+const CACHE = "sat-web-4";
+const FILES = ["./", "index.html", "style.css", "app.js", "lib/bytes.js", "lib/frame.js", "lib/ftdi.js", "lib/link.js", "lib/sat.js", "lib/serial.js",
 	"lib/tle.js", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())));

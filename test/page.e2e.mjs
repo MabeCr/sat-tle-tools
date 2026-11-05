@@ -108,6 +108,45 @@ await page.click("#paste-btn");
 assert.match(await text("#src-msg"), /No valid element sets/);
 
 assert.deepEqual(errors, []);
+
+// On an Android phone: Web Serial doesn't list an FTDI cable, so the first button is the WebUSB one
+{
+	const phone = await browser.newPage({ userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel) AppleWebKit/537.36 Chrome/130 Mobile Safari/537.36", viewport: { width: 390, height: 844 } });
+	const phoneErrors = [];
+	phone.on("pageerror", (e) => phoneErrors.push(e.message));
+	await phone.addInitScript(() => {
+		window.__ready = (async () => {
+			const { FakeRadio } = await import("/test/fakeradio.js");
+			const { FakeFtdi } = await import("/test/fakeftdi.js");
+			const V = await (await fetch("/test/vectors.json")).json();
+			const radio = new FakeRadio({ store: V.store, clock: 0 });
+			const dev = new FakeFtdi(radio);
+			window.__radio = radio;
+			window.__dev = dev;
+			const usb = new EventTarget();
+			usb.getDevices = async () => [];
+			usb.requestDevice = async (o) => { window.__filters = o.filters; return dev; };
+			Object.defineProperty(navigator, "usb", { value: usb, configurable: true });
+			Object.defineProperty(navigator, "serial", { value: { getPorts: async () => [], requestPort: async () => { throw new DOMException("no port", "NotFoundError"); }, addEventListener() {} }, configurable: true });
+		})();
+	});
+	await phone.goto(url);
+	await phone.evaluate(() => window.__ready);
+	assert.equal(await phone.locator("#connect-btn").innerText(), "Connect radio (USB cable)");
+	assert.equal(await phone.locator("#connect-alt-btn").innerText(), "Other serial port");
+	await phone.click("#connect-btn");
+	await phone.waitForSelector("#stored-list .item");
+	assert.match(await phone.locator("#radio-info").innerText(), /Connected: FAKE/);
+	assert.deepEqual(await phone.evaluate(() => window.__filters), [{ vendorId: 0x0403 }]);
+	assert.equal(await phone.evaluate(() => window.__dev.controls.length), 7);
+	// no cable chosen: the hint appears
+	await phone.click("#disconnect-btn");
+	await phone.evaluate(() => { navigator.usb.requestDevice = async () => { throw new DOMException("none", "NotFoundError"); }; });
+	await phone.click("#connect-btn");
+	await phone.waitForSelector("#connect-help:not([hidden])");
+	assert.deepEqual(phoneErrors, []);
+	await phone.close();
+}
 await browser.close();
 server.close();
 console.log("page.e2e: ok");

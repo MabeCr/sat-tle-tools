@@ -46,13 +46,14 @@ const ageDays = (epoch) => (Date.now() / 1000 - epoch) / 86400;
 function show(connected) {
 	for (const id of ["clock", "stored", "update", "diag"]) $(id).hidden = !connected;
 	$("connect-btn").hidden = connected;
+	$("connect-known-btn").hidden = connected;
 	$("disconnect-btn").hidden = !connected;
 }
 
-async function connect() {
+async function connect(onlyKnown = false) {
 	$("connect-help").hidden = true;
 	try {
-		stream = await SerialStream.choose();
+		stream = await SerialStream.choose({ onlyKnown });
 	} catch (e) {
 		if (e?.name === "NotFoundError") $("connect-help").hidden = false;	// the chooser closed with nothing chosen (or listed)
 		throw e;
@@ -328,7 +329,8 @@ function init() {
 	if (!serialSupported()) $("unsupported").hidden = false;
 	tickPhone();
 	setInterval(tickPhone, 1000);
-	$("connect-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), connect));
+	$("connect-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(false)));
+	$("connect-known-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), () => connect(true)));
 	$("disconnect-btn").addEventListener("click", disconnect);
 	$("clock-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), setClock));
 	$("stored-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), readStored));

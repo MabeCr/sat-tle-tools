@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MIT
+# The page's tests on every push and pull request, and a check that its copy of the test vectors is the one the
+# firmware repository's host tool produces (the two implementations of the update rules must agree).
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"      # weekly: the firmware repository's vectors may change on their own
+
+permissions:
+  contents: read
+
+jobs:
+  node:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Node tests (the logic against a fake radio and the host tool's vectors)
+        run: node --test test/*.test.mjs
+      - name: The page in a browser at a phone's size
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+          node test/page.e2e.mjs /tmp/page.png
+
+  vectors:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: test/vectors.json is the firmware repository's tests/data/sat_update_vectors.json
+        run: |
+          url=https://raw.githubusercontent.com/MabeCr/RadioFoundry-sat-firmware/main/tests/data/sat_update_vectors.json
+          if ! curl -fsSL "$url" -o /tmp/firmware-vectors.json; then
+            echo "::notice::the firmware repository's main has no vectors file yet (its pull request is not merged): nothing to compare"
+            exit 0
+          fi
+          if ! cmp -s /tmp/firmware-vectors.json test/vectors.json; then
+            echo "::error::test/vectors.json differs from the firmware repository's tests/data/sat_update_vectors.json: copy that file here and make the tests pass"
+            diff <(python3 -m json.tool /tmp/firmware-vectors.json) <(python3 -m json.tool test/vectors.json) | head -30
+            exit 1
+          fi
+          echo "vectors agree"

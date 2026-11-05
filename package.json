@@ -1,0 +1,16 @@
+{
+  "name": "sat-tle-tools",
+  "version": "1.0.0",
+  "description": "A web page to update a radio's satellite element sets, set its clock and read its diagnostics over the programming cable",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:page": "node test/page.e2e.mjs",
+    "serve": "python3 -m http.server 8000"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

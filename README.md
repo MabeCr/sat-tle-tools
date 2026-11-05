@@ -46,16 +46,21 @@ element set download. A change pushed to `main` is published again in a minute o
 ### Test
 
 ```bash
-node --test test/*.test.mjs        # the logic against a fake radio, and against vectors from the host tool
-node test/page.e2e.mjs [shot.png]  # the page in Chromium (Playwright) at a phone's size
+npm test                           # node --test: the logic against a fake radio, and against vectors from the host tool
+npm install && npx playwright install chromium && npm run test:page   # the page in Chromium at a phone's size
 ```
 
-### Where it comes from
+GitHub Actions runs both on every push and pull request (`.github/workflows/test.yml`), and checks the vectors against
+the firmware repository's every week.
 
-This is `tools/sat-web` of the RadioFoundry firmware work on satellite tracking
-(<https://github.com/MabeCr/RadioFoundry-sat-firmware>, MIT licensed). `test/vectors.json` is produced there by
-`tools/sat-web/test/make_vectors.py` from the host tool `tools/rfoundry_debug.py`, so the page and the tool apply the same
-rules to element sets; change it there, not here.
+### Where it comes from, and the one rule
+
+This repository is the only copy of the page. It began as `tools/sat-web` in the RadioFoundry firmware work on satellite
+tracking (<https://github.com/MabeCr/RadioFoundry-sat-firmware>, MIT licensed), which no longer holds it. The page applies
+the same rules to element sets as that repository's host tool (`tools/rfoundry_debug.py sat update`), and
+`test/vectors.json` is how the two agree: the host tool produces `tests/data/sat_update_vectors.json` there
+(`tools/sat_vectors.py`), this copy must be identical, and the CI here fails when it isn't. To change the update rules,
+change the host tool, regenerate the vectors, copy the file here, and make the tests pass.
 
 | File | What |
 |---|---|

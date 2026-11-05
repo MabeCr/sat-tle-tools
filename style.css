@@ -1,0 +1,47 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 The RadioFoundry Authors */
+:root {
+	--bg: #f6f8fa; --fg: #14202b; --muted: #55616d; --card: #ffffff; --line: #d3dae1; --accent: #0a5d9c; --accent-fg: #ffffff;
+	--ok: #17703a; --warn: #9a5b00; --bad: #b3261e;
+}
+@media (prefers-color-scheme: dark) {
+	:root { --bg: #0b1d2a; --fg: #e6edf3; --muted: #9db0bf; --card: #12293a; --line: #27425a; --accent: #4aa3e0; --accent-fg: #06141f;
+		--ok: #5fd08a; --warn: #f2b45a; --bad: #ff8a80; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 system-ui, sans-serif; }
+header, main, footer { max-width: 42rem; margin: 0 auto; padding: 0 16px; }
+h1 { font-size: 1.5rem; margin: 1rem 0 0.25rem; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 1rem 0 0.4rem; }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 14px 0; }
+.lead, .muted { color: var(--muted); }
+.mono, pre { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9rem; }
+pre { overflow-x: auto; background: var(--bg); padding: 10px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; align-items: end; }
+button { font: inherit; min-height: 44px; padding: 8px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button:disabled { opacity: 0.5; }
+button.danger { color: var(--bad); }
+input, textarea { font: inherit; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+label { display: block; }
+.add label { flex: 1 1 12rem; }
+.notice { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); }
+.warn { color: var(--warn); border-color: var(--warn); }
+.tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.tabs button { flex: 1; }
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.item { border-top: 1px solid var(--line); padding: 10px 0; display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; }
+.item:first-child { border-top: 0; }
+.item .name { font-weight: 600; }
+.item .meta { color: var(--muted); font-size: 0.9rem; grid-column: 1 / -1; }
+.tag { font-size: 0.8rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); }
+.tag.ok { color: var(--ok); border-color: var(--ok); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+.tag.bad { color: var(--bad); border-color: var(--bad); }
+.item input[type="checkbox"] { width: 1.4rem; height: 1.4rem; }
+.progress { list-style: none; padding: 0; margin: 8px 0 0; }
+.progress li { padding: 4px 0; border-top: 1px solid var(--line); font-size: 0.95rem; }
+.progress .bad { color: var(--bad); }
+.progress .ok { color: var(--ok); }
+footer { padding-bottom: 2rem; font-size: 0.9rem; }

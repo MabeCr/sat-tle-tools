@@ -1,0 +1,85 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 The RadioFoundry Authors -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0b1d2a">
+<title>Satellite TLE tool</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+	<h1>Satellite TLE tool</h1>
+	<p class="lead">Update a radio's satellite element sets, set its clock and read its diagnostics over the programming cable.</p>
+</header>
+<main>
+<p id="unsupported" class="notice warn" hidden>This browser can't talk to a serial port. Use Chrome or Edge, on a computer or on an Android phone with the cable on an OTG adapter.</p>
+
+<section id="connect">
+	<h2>1. Radio</h2>
+	<div class="row"><button id="connect-btn" class="primary">Connect radio</button><button id="disconnect-btn" hidden>Disconnect</button></div>
+	<p id="radio-info" class="muted">Plug the cable into the radio and the phone, switch the radio on, press Connect and choose the cable.</p>
+</section>
+
+<section id="clock" hidden>
+	<h2>2. Clock</h2>
+	<p>The radio's clock is lost when it is switched off unless it has a battery-backed clock, and a GPS fix needs open sky. Set it from this device.</p>
+	<p id="clock-phone" class="mono"></p>
+	<p id="clock-radio" class="muted"></p>
+	<div class="row"><button id="clock-btn">Set the radio's clock from this device</button></div>
+	<p id="clock-msg" class="muted" role="status"></p>
+</section>
+
+<section id="stored" hidden>
+	<h2>3. Satellites on the radio</h2>
+	<div id="stored-list"></div>
+	<div class="row"><button id="stored-btn">Read again</button></div>
+</section>
+
+<section id="update" hidden>
+	<h2>4. Update element sets</h2>
+	<div class="tabs" role="tablist">
+		<button role="tab" data-src="net" aria-selected="true">Download</button>
+		<button role="tab" data-src="paste" aria-selected="false">Paste</button>
+		<button role="tab" data-src="file" aria-selected="false">File</button>
+	</div>
+	<div id="src-net" class="src">
+		<p class="muted">CelesTrak's amateur radio group. Sets are kept in this browser; the download is repeated no sooner than every two hours unless you ask.</p>
+		<div class="row"><button id="net-btn">Get element sets</button><button id="net-force" hidden>Download again</button></div>
+	</div>
+	<div id="src-paste" class="src" hidden>
+		<textarea id="paste-text" rows="6" spellcheck="false" placeholder="ISS (ZARYA)&#10;1 25544U 98067A ...&#10;2 25544 ..."></textarea>
+		<div class="row"><button id="paste-btn">Read these</button></div>
+	</div>
+	<div id="src-file" class="src" hidden>
+		<label class="file">Choose a text file of element sets <input type="file" id="file-in" accept=".txt,.tle,text/plain"></label>
+	</div>
+	<p id="src-msg" class="muted" role="status"></p>
+
+	<div id="sets" hidden>
+		<h3>Element sets found</h3>
+		<div id="sets-list"></div>
+		<div class="row add"><label>Add by catalog number <input id="add-norad" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 44909"></label><button id="add-btn">Add</button></div>
+		<div class="row"><button id="update-btn" class="primary">Update the radio</button></div>
+		<ul id="progress" class="progress" aria-live="polite"></ul>
+	</div>
+</section>
+
+<section id="diag" hidden>
+	<h2>5. Diagnostics</h2>
+	<p class="muted">Read only. Nothing here changes the radio.</p>
+	<div class="row"><button id="diag-btn">Read diagnostics</button><button id="diag-copy" hidden>Copy report</button></div>
+	<pre id="diag-out" class="mono" hidden></pre>
+</section>
+</main>
+<footer>
+	<p class="muted">Nothing about the radio is sent anywhere. The only request this page makes is the element set download. MIT licensed.</p>
+</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

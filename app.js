@@ -50,7 +50,13 @@ function show(connected) {
 }
 
 async function connect() {
-	stream = await SerialStream.choose();
+	$("connect-help").hidden = true;
+	try {
+		stream = await SerialStream.choose();
+	} catch (e) {
+		if (e?.name === "NotFoundError") $("connect-help").hidden = false;	// the chooser closed with nothing chosen (or listed)
+		throw e;
+	}
 	link = new Link(stream);
 	const v = await link.version();
 	const features = (v.features || "").split(/\s+/);

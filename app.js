@@ -64,7 +64,7 @@ async function connect(method) {
 	}
 	link = new Link(stream);
 	const v = await link.version();
-	const features = (v.features || "").split(/\s+/);
+	const features = (v.features || "").split(/[\s,]+/);	// the radio lists them comma separated: FM,SUBTONE,...,SAT,...
 	if (!features.includes("SAT")) {
 		say($("radio-info"), `${v.board || "This radio"} answered, but this firmware has no satellite tracking (SAT is not in its features). The diagnostics still work.`, "warn");
 		show(true);

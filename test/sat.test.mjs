@@ -19,6 +19,7 @@ test("version and the sat view", async () => {
 	const r = new FakeRadio({ store: V.store });
 	const l = link(r);
 	assert.match((await l.version()).features, /SAT/);
+	assert.ok((await l.version()).features.split(/[\s,]+/).includes("SAT"), "SAT is one of the comma separated features");
 	assert.equal((await l.view("sat")).kv["sat.slots"], "32");
 	assert.deepEqual((await sat.list(l)).map((x) => [x.slot, x.norad, x.name]), [[0, 25544, "ISS"], [1, 27607, "SO-50"], [2, 43017, "AO-91"]]);
 });

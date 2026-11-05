@@ -44,7 +44,7 @@ export class FakeRadio {
 	status(n) { return new Uint8Array([n]); }
 
 	answer(cmd, p) {
-		if (cmd === 0x02) return this.ok(ascii(`board=FAKE\nrelease=test\nfeatures=HOSTLINK DEBUGLINK${this.sat ? " SAT" : ""}\n`));
+		if (cmd === 0x02) return this.ok(ascii(`board=FAKE\nrelease=test\nfeatures=FM,DMR,DEBUGLINK,HOSTLINK${this.sat ? ",SAT" : ""},CPS_FAST\n`));
 		if (cmd === 0x09) return this.viewAnswer(p[0]);
 		if (cmd === 0x20) return this.sat ? this.satAnswer(p) : this.status(4);
 		return this.status(4);

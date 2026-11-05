@@ -35,7 +35,7 @@ Web Serial needs `https`, so a phone needs the page at a real address. In this r
 deployment > Source: Deploy from a branch**, branch `main`, folder `/ (root)`, Save. After a minute the address is at the top of
 that page: `https://<user>.github.io/sat-tle-tools/`. Open it in Chrome on the phone and, once it works, *Add to Home
 screen* / *Install app*: it then opens like an app and, with the service worker, works with no coverage using the last
-element set download. A change pushed to `main` is published again in a minute or two; reload the page once to pick it up.
+element set download. A change pushed to `main` is published again in a minute or two; reload the page once to pick it up. If a deployment times out on GitHub's side (it happens), pushing any small change to `main` starts a new one.
 
 ### Test
 

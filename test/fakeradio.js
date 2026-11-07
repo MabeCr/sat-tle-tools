@@ -101,6 +101,26 @@ export class FakeRadio {
 			return this.ok(new Uint8Array([1]), le32(r.norad), new Uint8Array([r.elements ? 1 : 0]), le32(r.epoch), le32(r.up_hz), le32(r.down_hz),
 				le16(r.up_tone), le16(r.arm_tone), le16(r.arm_ms), le16(r.armed_s), ascii(r.name));
 		}
+		case 13: {	// RETUNE_TEST: base u32, step i32, count u8, gap u16, wide u8
+			const count = p[9], gap = u16le(p, 10);
+			if (p.length !== 13 || count < 1 || count > 32 || gap < 20 || gap > 1000 || count * gap > 10000 || (u32le(p, 5) | 0) === 0 || p[12] > 1)
+				return this.status(2);
+			if (this.retuneState === 1 || this.retuneState === 2) return this.status(3);
+			this.retune = { count, base: u32le(p, 1) };
+			this.retuneState = this.retuneRefuse ? 4 : 3;	// the radio task runs it at once in this fake
+			return this.ok();
+		}
+		case 14: {	// RETUNE_RESULT
+			const st = this.retuneState || 0;
+			if (st !== 3 && st !== 4) return this.ok(new Uint8Array([st]));
+			const n = st === 3 ? this.retune.count : 0;
+			const hops = [];
+			for (let i = 0; i < n; i++) {
+				const never = this.retuneNeverAt === i;
+				hops.push(le16(40 + i), le32(never ? 0xFFFFFFFF : 600 + 10 * i), le16(never ? 0xFF9C : 0xFF9C), new Uint8Array([90, never ? 255 : 3]));
+			}
+			return this.ok(new Uint8Array([st, st === 4 ? this.retuneWhy || 3 : 0, n]), le16(0xFFBA), le16(0xFFB7), new Uint8Array([20]), ...hops);
+		}
 		case 11: {
 			const at = this.rows.findIndex((r) => r && r.norad === u32le(p, 1));
 			if (at < 0) return this.status(4);

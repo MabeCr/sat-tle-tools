@@ -16,7 +16,10 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 4. **Update element sets**: Download (CelesTrak's amateur group, kept in the browser and not repeated within two hours),
    Paste, or File. The page lists the satellites on the radio and whether the data has a newer set; add one that isn't
    stored by catalog number (or an exact name); **Update the radio**.
-5. **Diagnostics**: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
+5. **Retune test**: receive only. It steps the receiver between a frequency (a NOAA weather channel by default, 162.400 MHz;
+   any steady FM carrier will do) and an offset of it, and times how long the signal takes to settle after each retune.
+   That decides how Doppler correction can be done. Needs firmware with the retune test.
+6. **Diagnostics**: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
    orbit model's speed. *Copy report* puts it on the clipboard for a bug report.
 
 **Connecting from a phone.** Chrome on Android gives Web Serial only to USB devices of the standard serial class (and to

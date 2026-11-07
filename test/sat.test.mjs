@@ -129,3 +129,47 @@ test("two requests started together are answered in order", async () => {
 	assert.equal(a.board, "FAKE");
 	assert.equal(b.length, 3);
 });
+
+test("the retune test: started, polled and summarized", async () => {
+	const r = new FakeRadio();
+	const l = link(r);
+	assert.deepEqual((await sat.retuneResult(l)).hops, []);
+	assert.equal((await sat.retuneResult(l)).state, "none");
+	const states = [];
+	const res = await sat.retuneTest(l, { base_hz: 162400000, step_hz: 2000, count: 4, gap_ms: 100, wide: true }, { poll: 5, onState: (s) => states.push(s) });
+	assert.equal(res.state, "done");
+	assert.equal(res.count, 4);
+	assert.equal(res.ref_base, -70);
+	assert.equal(res.ref_step, -73);
+	assert.equal(res.noise_base, 20);
+	assert.deepEqual(res.hops.map((h) => h.settle_us), [600, 610, 620, 630]);
+	assert.deepEqual(res.hops[0], { call_us: 40, settle_us: 600, min_rssi: -100, max_noise: 90, lost: 3 });
+	const sum = sat.retuneSummary(res);
+	assert.match(sum.text, /Settled in 0\.60 to 0\.63 ms \(median 0\.62 ms\)/);
+	assert.match(sum.text, /dipped in 4 of 4/);
+	assert.equal(sum.never, 0);
+	const call = r.calls.find((c) => c.op === 13);
+	assert.deepEqual([...call.args].slice(0, 8), [0, 7, 174, 9, 208, 7, 0, 0]);	// 162,400,000 and 2000, little endian
+	assert.equal(call.args[8], 4);	// the count
+});
+
+test("the retune test: a retune that never settles, and a refusal", async () => {
+	const r = new FakeRadio();
+	r.retuneNeverAt = 1;
+	const res = await sat.retuneTest(link(r), { base_hz: 162400000, step_hz: -1500, count: 3, gap_ms: 50, wide: false }, { poll: 5 });
+	assert.deepEqual(res.hops.map((h) => h.settle_us), [600, null, 620]);
+	assert.match(sat.retuneSummary(res).text, /1 of 3 never did/);
+	const r2 = new FakeRadio();
+	r2.retuneRefuse = true;
+	r2.retuneWhy = 3;
+	const ref = await sat.retuneTest(link(r2), { base_hz: 162400000, step_hz: 2000, count: 4, gap_ms: 100 }, { poll: 5 });
+	assert.equal(ref.state, "refused");
+	assert.equal(sat.retuneSummary(ref).text, "Refused: the radio is not on an FM channel or the VFO.");
+});
+
+test("the retune test: arguments the radio refuses are errors", async () => {
+	const l = link(new FakeRadio());
+	await assert.rejects(() => sat.retuneStart(l, { base_hz: 162400000, step_hz: 2000, count: 0, gap_ms: 100 }), (e) => e.status === 2);
+	await assert.rejects(() => sat.retuneStart(l, { base_hz: 162400000, step_hz: 0, count: 4, gap_ms: 100 }), (e) => e.status === 2);
+	await assert.rejects(() => sat.retuneStart(l, { base_hz: 162400000, step_hz: 2000, count: 32, gap_ms: 1000 }), (e) => e.status === 2);
+});

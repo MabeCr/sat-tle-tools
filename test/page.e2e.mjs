@@ -102,6 +102,19 @@ await page.waitForSelector("#diag-out:not([hidden])");
 assert.match(await text("#diag-out"), /heap_min_free=15416/);
 assert.match(await text("#diag-out"), /crash.valid=0/);
 
+// the retune test, with a frequency of the user's choosing
+await page.fill("#rt-freq", "162.475");
+await page.fill("#rt-count", "3");
+await page.fill("#rt-gap", "30");
+await page.click("#rt-btn");
+await page.waitForSelector("#rt-out:not([hidden])");
+assert.match(await text("#rt-msg"), /Settled in/);
+assert.match(await text("#rt-out"), /162\.475 MHz, step 2 kHz, 3 retunes 30 ms apart, 25 kHz wide/);
+assert.equal(await page.evaluate(() => [...window.__radio.calls.find((c) => c.op === 13).args.slice(0, 4)].reduce((a, b, i) => a + b * 2 ** (8 * i), 0)), 162475000);
+await page.fill("#rt-count", "40");
+await page.click("#rt-btn");
+assert.match(await text("#rt-msg"), /Retunes: 1 to 32/);
+
 // a bad paste says so
 await page.fill("#paste-text", "nothing here");
 await page.click("#paste-btn");

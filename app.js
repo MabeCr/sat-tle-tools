@@ -47,7 +47,7 @@ const ageDays = (epoch) => (Date.now() / 1000 - epoch) / 86400;
 // --- connect ---
 
 function show(connected) {
-	for (const id of ["clock", "stored", "update", "diag"]) $(id).hidden = !connected;
+	for (const id of ["clock", "stored", "update", "retune", "diag"]) $(id).hidden = !connected;
 	$("connect-btn").hidden = connected;
 	$("connect-alt-btn").hidden = connected || $("connect-alt-btn").dataset.none === "1";
 	$("disconnect-btn").hidden = !connected;
@@ -68,7 +68,7 @@ async function connect(method) {
 	if (!features.includes("SAT")) {
 		say($("radio-info"), `${v.board || "This radio"} answered, but this firmware has no satellite tracking (SAT is not in its features). The diagnostics still work.`, "warn");
 		show(true);
-		for (const id of ["clock", "stored", "update"]) $(id).hidden = true;
+		for (const id of ["clock", "stored", "update", "retune"]) $(id).hidden = true;
 		return;
 	}
 	say($("radio-info"), `Connected: ${v.board || "radio"}${v.release ? `, release ${v.release}` : ""}.`, "ok");
@@ -304,6 +304,42 @@ async function updateRadio() {
 	}
 }
 
+// --- the retune test ---
+
+let retuneText = "";
+
+async function retuneRun() {
+	const freq = Number($("rt-freq").value), step = Number($("rt-step").value), count = Number($("rt-count").value), gap = Number($("rt-gap").value);
+	const msg = $("rt-msg");
+	if (!(freq >= 30 && freq <= 1000)) return say(msg, "The frequency is in MHz, for example 162.400.", "bad");
+	if (!(Math.abs(step) >= 0.001 && Math.abs(step) <= 100)) return say(msg, "The step is in kHz, 0.001 to 100, either sign.", "bad");
+	if (!Number.isInteger(count) || count < 1 || count > 32) return say(msg, "Retunes: 1 to 32.", "bad");
+	if (!Number.isInteger(gap) || gap < 20 || gap > 1000) return say(msg, "Gap: 20 to 1000 ms.", "bad");
+	if (count * gap > 10000) return say(msg, "Retunes times gap is at most 10 seconds.", "bad");
+	$("rt-out").hidden = $("rt-copy").hidden = true;
+	say(msg, "Running… the radio is busy for a few seconds and the audio will click.");
+	const params = { base_hz: Math.round(freq * 1e6), step_hz: Math.round(step * 1e3), count, gap_ms: gap, wide: $("rt-width").value === "25" };
+	let res;
+	try {
+		res = await sat.retuneTest(link, params);
+	} catch (e) {
+		if (e instanceof LinkError && e.status === 3) return say(msg, "A test is already running on the radio: wait a moment and try again.", "warn");
+		if (e instanceof LinkError && e.status === 2) return say(msg, "The radio refused those values, or its firmware has no retune test yet.", "bad");
+		throw e;
+	}
+	const sum = sat.retuneSummary(res);
+	say(msg, sum.text, res.state === "refused" ? "warn" : sum.never ? "warn" : "ok");
+	if (res.state !== "done") return;
+	const lines = [`Retune test on ${freq} MHz, step ${step} kHz, ${count} retunes ${gap} ms apart, ${$("rt-width").value} kHz wide`,
+		`Steady level ${res.ref_base} dBm on the base frequency, ${res.ref_step} dBm on the other; noise ${res.noise_base}`,
+		" #  call us  settle us  lowest dBm  noise  no carrier"];
+	res.hops.forEach((h, i) => lines.push(`${String(i + 1).padStart(2)} ${String(h.call_us).padStart(8)} ${(h.settle_us === null ? "never" : String(h.settle_us)).padStart(10)} ${String(h.min_rssi).padStart(11)} ${String(h.max_noise).padStart(6)} ${String(h.lost).padStart(11)}`));
+	lines.push(sum.text);
+	retuneText = lines.join("\n");
+	$("rt-out").textContent = retuneText;
+	$("rt-out").hidden = $("rt-copy").hidden = false;
+}
+
 // --- diagnostics ---
 
 async function diagnostics() {
@@ -354,6 +390,10 @@ function init() {
 	$("add-btn").addEventListener("click", addByInput);
 	$("add-norad").addEventListener("keydown", (e) => { if (e.key === "Enter") addByInput(); });
 	$("update-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), updateRadio));
+	$("rt-btn").addEventListener("click", (e) => run(e.target, $("rt-msg"), retuneRun));
+	$("rt-copy").addEventListener("click", async () => {
+		try { await navigator.clipboard.writeText(retuneText); say($("rt-msg"), "Results copied.", "ok"); } catch { say($("rt-msg"), "Couldn't copy: select the text instead.", "warn"); }
+	});
 	$("diag-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), diagnostics));
 	$("diag-copy").addEventListener("click", async () => {
 		try { await navigator.clipboard.writeText($("diag-out").textContent); say($("radio-info"), "Report copied.", "ok"); } catch { say($("radio-info"), "Couldn't copy: select the text instead.", "warn"); }

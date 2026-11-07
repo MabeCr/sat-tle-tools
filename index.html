@@ -71,8 +71,25 @@
 	</div>
 </section>
 
+<section id="retune" hidden>
+	<h2>5. Retune test</h2>
+	<p>How long the receiver takes to settle after each retune, which decides how Doppler correction can be done. <b>Receive only: nothing is transmitted.</b>
+		Put the radio on an FM channel or the VFO first, and use a steady FM carrier, such as a NOAA weather channel.</p>
+	<div class="grid">
+		<label>Frequency (MHz) <input id="rt-freq" inputmode="decimal" value="162.400" list="rt-wx"></label>
+		<label>Step (kHz) <input id="rt-step" inputmode="decimal" value="2"></label>
+		<label>Retunes <input id="rt-count" inputmode="numeric" value="12"></label>
+		<label>Gap (ms) <input id="rt-gap" inputmode="numeric" value="150"></label>
+		<label>Width <select id="rt-width"><option value="25">25 kHz</option><option value="12.5">12.5 kHz</option></select></label>
+	</div>
+	<datalist id="rt-wx"><option value="162.400"><option value="162.425"><option value="162.450"><option value="162.475"><option value="162.500"><option value="162.525"><option value="162.550"></datalist>
+	<div class="row"><button id="rt-btn" class="primary">Run the test</button><button id="rt-copy" hidden>Copy results</button></div>
+	<p id="rt-msg" class="muted" role="status"></p>
+	<pre id="rt-out" class="mono" hidden></pre>
+</section>
+
 <section id="diag" hidden>
-	<h2>5. Diagnostics</h2>
+	<h2>6. Diagnostics</h2>
 	<p class="muted">Read only. Nothing here changes the radio.</p>
 	<div class="row"><button id="diag-btn">Read diagnostics</button><button id="diag-copy" hidden>Copy report</button></div>
 	<pre id="diag-out" class="mono" hidden></pre>

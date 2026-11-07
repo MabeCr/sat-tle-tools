@@ -26,6 +26,8 @@ button.danger { color: var(--bad); }
 input, textarea { font: inherit; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 label { display: block; }
 .add label { flex: 1 1 12rem; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 10px; margin: 8px 0; }
+select { font: inherit; width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .notice { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); }
 .warn { color: var(--warn); border-color: var(--warn); }
 .tabs { display: flex; gap: 6px; margin-bottom: 8px; }

@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { checksum, catalog, epoch, parse, compare } from "../lib/tle.js";
+import { checksum, catalog, epoch, parse, compare, orbit } from "../lib/tle.js";
 
 const V = JSON.parse(readFileSync(new URL("./vectors.json", import.meta.url)));
 
@@ -57,4 +57,12 @@ test("compare: new, newer, same, older, with the radio's one-second rounding", (
 	assert.equal(compare(set, { elements: true, epoch: 999999 }), "same");	// stored rounds down
 	assert.equal(compare(set, { elements: true, epoch: 1000001 }), "same");
 	assert.equal(compare(set, { elements: true, epoch: 1001000 }), "older");
+});
+
+test("orbit: inclination, period and height from line 2", () => {
+	const o = orbit(parse(V.text).get(25544));
+	assert.ok(Math.abs(o.incl - 51.64) < 0.01);
+	assert.ok(Math.abs(o.period_min - 92.9) < 0.1);
+	assert.ok(o.alt_km > 400 && o.alt_km < 435);
+	assert.ok(Number.isNaN(orbit({ l2: "2 25544  51.6416" + " ".repeat(53) }).period_min));
 });

@@ -10,17 +10,23 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 
 ### Use it
 
-1. Open the page (see "Publish it" below), plug the cable into the radio and the device, switch the radio on.
-2. **Connect radio**, and choose the cable.
-3. **Clock**: *Set the radio's clock from this device* (the radio refuses a time before 2026).
-4. **Update element sets**: Download (CelesTrak's amateur group, kept in the browser and not repeated within two hours),
-   Paste, or File. The page lists the satellites on the radio and whether the data has a newer set; add one that isn't
-   stored by catalog number (or an exact name); **Update the radio**.
-5. **Retune test**: receive only. It steps the receiver between a frequency (a NOAA weather channel by default, 162.400 MHz;
-   any steady FM carrier will do) and an offset of it, and times how long the signal takes to settle after each retune.
-   That decides how Doppler correction can be done. Needs firmware with the retune test.
-6. **Diagnostics**: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
-   orbit model's speed. *Copy report* puts it on the clipboard for a bug report.
+1. Open the page (see "Publish it" below). It downloads CelesTrak's amateur radio element sets at once (kept in the
+   browser and not repeated within two hours; **Paste** and **File** are the fallbacks). No radio is needed yet.
+2. **Choose satellites**: every set read is listed, with a search box and a check box each. The page counts the radio's
+   32 places. *Preview what will be written* shows each chosen satellite's data age, inclination, period and height,
+   and whether it is new on the radio, replaces an older set or is already current.
+3. **Write to the radio**: plug the cable into the radio and the device, switch the radio on, **Connect radio** and
+   choose the cable. Satellites already on the radio whose data has a newer set are ticked for you. *Write to the radio*
+   sets the clock too (the box is ticked by default; the radio refuses a time before 2026) and then stores the chosen
+   satellites. A satellite that wasn't on the radio is stored with no frequencies.
+4. **On the radio**: what the radio holds, read when you connect (so you can look before writing) and again after a
+   write. *Delete* removes one.
+5. **Advanced**: the *retune test* and *diagnostics*.
+   - Retune test: receive only. It steps the receiver between a frequency (a NOAA weather channel by default,
+     162.400 MHz; any steady FM carrier will do) and an offset of it, and times how long the signal takes to settle after
+     each retune. That decides how Doppler correction can be done. Needs firmware with the retune test.
+   - Diagnostics: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
+     orbit model's speed. *Copy report* puts it on the clipboard for a bug report.
 
 **Connecting from a phone.** Chrome on Android gives Web Serial only to USB devices of the standard serial class (and to
 Bluetooth serial ports), so an FTDI programming cable doesn't appear in its serial port list. The page therefore talks to

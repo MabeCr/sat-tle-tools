@@ -57,46 +57,79 @@ await page.addInitScript(() => {
 		Object.defineProperty(navigator, "serial", { value: { getPorts: async () => [], requestPort: async () => port, addEventListener() {} }, configurable: true });
 	})();
 });
+const SETS = JSON.parse(await readFile(join(ROOT, "test/vectors.json"), "utf8")).text;
+const celestrak = (route) => route.fulfill({ status: 200, contentType: "text/plain", body: SETS });
+await page.route("https://celestrak.org/**", celestrak);
 await page.goto(url);
 await page.evaluate(() => window.__ready);
 const text = (sel) => page.locator(sel).innerText();
 
 assert.equal(await page.locator("#unsupported").isHidden(), true);
+
+// 1 and 2 need no radio: the sets download when the page opens and every one is listed to choose from
+await page.waitForSelector("#sets-list .item");
+assert.match(await text("#src-msg"), /3 element sets read/);
+assert.equal(await page.locator("#sets-list .item").count(), 3);
+assert.equal(await page.locator("#sets-list input:checked").count(), 0);
+assert.equal(await page.locator("#connect-btn").isVisible(), true);
+assert.equal(await page.locator("#write").isHidden(), true);
+// search and choose
+await page.fill("#filter", "so-50");
+assert.equal(await page.locator("#sets-list .item").count(), 1);
+await page.fill("#filter", "44909");
+assert.equal(await page.locator("#sets-list .item").count(), 1);
+await page.check("#sets-list input");
+assert.match(await text("#count"), /1 chosen/);
+await page.fill("#filter", "");
+await page.check("#only-picked");
+assert.equal(await page.locator("#sets-list .item").count(), 1);
+await page.uncheck("#only-picked");
+// the preview, before any radio
+await page.click("#preview summary");
+assert.match(await text("#preview-list"), /RS-44.*inclination 82\.5°, period 113\.4 min, height about 13\d\d km.*stored, with no frequencies/s);
+
+// 3: connect; the radio's satellites are listed (step 4) before anything is written, and its ISS (older data) starts ticked
 await page.click("#connect-btn");
 await page.waitForSelector("#stored-list .item");
 assert.match(await text("#radio-info"), /Connected: FAKE/);
 assert.equal(await page.locator("#stored-list .item").count(), 3);
 assert.match(await text("#clock-radio"), /no time yet|has a time/);
+assert.equal(await page.evaluate(() => window.__radio.rows.filter(Boolean).length), 3);
+assert.match(await text("#count"), /\d+ of 32 places/);
+const ticked = await page.locator("#sets-list .item:has(input:checked) .name").allInnerTexts();
+assert.ok(ticked.some((t) => /ISS/.test(t)) && ticked.some((t) => /RS-44/.test(t)), ticked.join("|"));
+assert.ok(!ticked.some((t) => /SO-50/.test(t)));
 
-// the clock
-await page.click("#clock-btn");
-await page.waitForFunction(() => window.__radio.clock > 1.7e9 && document.getElementById("clock-msg").textContent !== "");
-assert.match(await text("#clock-msg"), /Radio clock set to 20\d\d-/);
-
-// paste the sets and update
-await page.click('.tabs button[data-src="paste"]');
-await page.fill("#paste-text", await page.evaluate(() => window.__vectors.text));
-await page.click("#paste-btn");
-await page.waitForSelector("#sets-list .item");
-assert.match(await text("#src-msg"), /3 element sets read/);
-await page.fill("#add-norad", "44909");
-await page.click("#add-btn");
-assert.equal(await page.locator("#sets-list .item").count(), 4);
+// write: the clock goes too (the box is ticked), then the chosen sets
 await page.click("#update-btn");
-await page.waitForFunction(() => document.querySelectorAll("#progress li").length >= 4);
+await page.waitForFunction(() => /Done:|Nothing needed|failed/.test(document.getElementById("progress").textContent));
 const progress = await text("#progress");
+assert.match(progress, /Radio clock set to 20\d\d-/);
 assert.match(progress, /ISS.*updated/);
 assert.match(progress, /RS-44.*stored/);
-assert.match(progress, /SO-50.*already current/);
+assert.doesNotMatch(progress, /SO-50/);
+assert.match(progress, /Done: 2 written/);
+assert.ok(await page.evaluate(() => window.__radio.clock) > 1.7e9);
 assert.equal(await page.evaluate(() => window.__radio.rows.filter(Boolean).length), 4);
+assert.equal(await page.locator("#stored-list .item").count(), 4);
 await page.screenshot({ path: process.argv[2] || "/tmp/sat-web-page.png", fullPage: true });
+
+// the clock alone, with nothing chosen
+await page.click("#clear-btn");
+assert.match(await text("#count"), /0 chosen/);
+await page.uncheck("#clock-too");
+assert.equal(await page.locator("#update-btn").isDisabled(), true);
+await page.check("#clock-too");
+await page.click("#clock-btn");
+await page.waitForFunction(() => document.getElementById("clock-msg").textContent.startsWith("Radio clock set"));
 
 // delete one (the page asks first)
 page.once("dialog", (d) => d.accept());
 await page.locator("#stored-list .item button").first().click();
 await page.waitForFunction(() => document.querySelectorAll("#stored-list .item").length === 3);
 
-// diagnostics
+// the advanced part: diagnostics
+await page.click("#advanced summary");
 await page.click("#diag-btn");
 await page.waitForSelector("#diag-out:not([hidden])");
 assert.match(await text("#diag-out"), /heap_min_free=15416/);
@@ -116,6 +149,7 @@ await page.click("#rt-btn");
 assert.match(await text("#rt-msg"), /Retunes: 1 to 32/);
 
 // a bad paste says so
+await page.click('.tabs button[data-src="paste"]');
 await page.fill("#paste-text", "nothing here");
 await page.click("#paste-btn");
 assert.match(await text("#src-msg"), /No valid element sets/);
@@ -143,6 +177,7 @@ assert.deepEqual(errors, []);
 			Object.defineProperty(navigator, "serial", { value: { getPorts: async () => [], requestPort: async () => { throw new DOMException("no port", "NotFoundError"); }, addEventListener() {} }, configurable: true });
 		})();
 	});
+	await phone.route("https://celestrak.org/**", celestrak);
 	await phone.goto(url);
 	await phone.evaluate(() => window.__ready);
 	assert.equal(await phone.locator("#connect-btn").innerText(), "Connect radio (USB cable)");

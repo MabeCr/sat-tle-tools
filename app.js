@@ -6,7 +6,7 @@ import { Link, LinkError } from "./lib/link.js";
 import { FtdiStream, errorText as usbErrorText, usbSupported } from "./lib/ftdi.js";
 import { SerialStream, errorText, serialSupported } from "./lib/serial.js";
 import * as sat from "./lib/sat.js";
-import { SAT_TLE_URL, compare, parse } from "./lib/tle.js";
+import { SAT_TLE_URL, compare, orbit, parse } from "./lib/tle.js";
 
 const $ = (id) => document.getElementById(id);
 const CACHE_KEY = "sat-web.tle";
@@ -18,8 +18,9 @@ let how = "serial";		// how the radio is connected: "serial" (Web Serial) or "us
 const ANDROID = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
 let stored = [];		// the radio's list, as sat.list gives it
 let tles = new Map();		// the element sets read from the source
-const added = new Set();	// catalog numbers to store that the radio doesn't hold yet
-const unchecked = new Set();	// stored satellites the user turned off
+const picked = new Set();	// catalog numbers the user chose to write
+const touched = new Set();	// ones the user ticked or cleared themselves: a connect doesn't change those
+const SLOTS = 32;		// what the radio holds
 
 function say(el, text, cls = "") {
 	el.textContent = text;
@@ -47,7 +48,8 @@ const ageDays = (epoch) => (Date.now() / 1000 - epoch) / 86400;
 // --- connect ---
 
 function show(connected) {
-	for (const id of ["clock", "stored", "update", "retune", "diag"]) $(id).hidden = !connected;
+	for (const id of ["write", "stored", "advanced"]) $(id).hidden = !connected;
+	$("retune").hidden = false;
 	$("connect-btn").hidden = connected;
 	$("connect-alt-btn").hidden = connected || $("connect-alt-btn").dataset.none === "1";
 	$("disconnect-btn").hidden = !connected;
@@ -68,7 +70,7 @@ async function connect(method) {
 	if (!features.includes("SAT")) {
 		say($("radio-info"), `${v.board || "This radio"} answered, but this firmware has no satellite tracking (SAT is not in its features). The diagnostics still work.`, "warn");
 		show(true);
-		for (const id of ["clock", "stored", "update", "retune"]) $(id).hidden = true;
+		for (const id of ["write", "stored", "retune"]) $(id).hidden = true;
 		return;
 	}
 	say($("radio-info"), `Connected: ${v.board || "radio"}${v.release ? `, release ${v.release}` : ""}.`, "ok");
@@ -80,7 +82,9 @@ async function connect(method) {
 async function disconnect() {
 	const s = stream;
 	stream = link = null;
+	stored = [];
 	show(false);
+	renderSets();
 	say($("radio-info"), "Disconnected. Press Connect to start again.");
 	try { await s?.close(); } catch { /* gone */ }
 }
@@ -124,7 +128,7 @@ async function readStored() {
 	if (!stored.length) {
 		const p = document.createElement("p");
 		p.className = "muted";
-		p.textContent = "No satellites are stored. Add some below, by catalog number.";
+		p.textContent = "No satellites are stored yet: choose some in step 2 and write them.";
 		box.append(p);
 	}
 	for (const r of stored) {
@@ -150,6 +154,11 @@ async function readStored() {
 		item.append(name, del, meta);
 		box.append(item);
 	}
+	// Satellites already on the radio whose data has a newer set start ticked, unless the user decided otherwise
+	for (const r of stored) {
+		const set = tles.get(r.norad);
+		if (set && !touched.has(r.norad) && ["new", "newer"].includes(compare(set, r))) picked.add(r.norad);
+	}
 	renderSets();
 }
 
@@ -164,14 +173,19 @@ function useText(text, from) {
 	tles = parse(text);
 	if (!tles.size) {
 		say($("src-msg"), "No valid element sets in that data (each needs two lines of 69 characters with correct check digits).", "bad");
-		$("sets").hidden = true;
+		tles = new Map();
+		$("choose").hidden = true;
 		return;
 	}
 	say($("src-msg"), `${tles.size} element sets read${from ? ` (${from})` : ""}.`, "ok");
-	unchecked.clear();
-	added.clear();
-	$("sets").hidden = false;
+	picked.clear();
+	touched.clear();
 	$("progress").textContent = "";
+	$("choose").hidden = false;
+	for (const r of stored) {	// a radio is already connected: its satellites start ticked when the data is newer
+		const set = tles.get(r.norad);
+		if (set && ["new", "newer"].includes(compare(set, r))) picked.add(r.norad);
+	}
 	renderSets();
 }
 
@@ -180,7 +194,6 @@ async function download(force) {
 	try { cached = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { /* none */ }
 	if (cached && !force && Date.now() - cached.t < CACHE_MS) {
 		useText(cached.text, `kept from ${Math.round((Date.now() - cached.t) / 60000)} minutes ago`);
-		$("net-force").hidden = false;
 		return;
 	}
 	say($("src-msg"), "Downloading…");
@@ -199,106 +212,122 @@ async function download(force) {
 	}
 	try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), text })); } catch { /* full or private */ }
 	useText(text, "downloaded now");
-	$("net-force").hidden = false;
 }
 
-// The sets to show: every satellite on the radio, then the ones added
-function renderSets() {
-	const box = $("sets-list");
+// Step 2: every set read, by name; the ticked ones are what step 3 writes
+function slotsUsed() {
+	return new Set([...stored.map((r) => r.norad), ...picked]).size;
+}
+
+function renderCount() {
+	const used = slotsUsed();
+	say($("count"), `${picked.size} chosen. ${link ? `${used} of ${SLOTS} places on the radio used after writing.` : `The radio holds ${SLOTS}.`}`, used > SLOTS ? "bad" : "");
+	$("update-btn").disabled = used > SLOTS || (!picked.size && !$("clock-too").checked);
+	renderPreview();
+}
+
+function stateOf(set, norad) {
+	return compare(set, stored.find((r) => r.norad === norad));
+}
+
+function renderPreview() {
+	const box = $("preview-list");
 	box.textContent = "";
-	if (!tles.size) return;
-	const rows = [...stored.map((r) => ({ norad: r.norad, rec: r })), ...[...added].filter((n) => !stored.some((r) => r.norad === n)).map((n) => ({ norad: n, rec: null }))];
+	const rows = [...picked].filter((n) => tles.has(n)).sort((a, b) => (tles.get(a).name || "").localeCompare(tles.get(b).name || ""));
 	if (!rows.length) {
 		const p = document.createElement("p");
 		p.className = "muted";
-		p.textContent = "Nothing on the radio to update yet: add a satellite below.";
+		p.textContent = "Nothing chosen yet.";
 		box.append(p);
 	}
-	for (const { norad, rec } of rows) {
-		const set = tles.get(norad);
+	for (const n of rows) {
+		const set = tles.get(n), o = orbit(set), st = stateOf(set, n);
 		const item = document.createElement("div");
 		item.className = "item";
-		const label = document.createElement("label");
-		const cb = document.createElement("input");
-		cb.type = "checkbox";
-		const state = set ? compare(set, rec) : "missing";
-		cb.checked = !unchecked.has(norad) && (state === "newer" || state === "new");
-		cb.disabled = !set || state === "same" || state === "older";
-		cb.addEventListener("change", () => (cb.checked ? unchecked.delete(norad) : unchecked.add(norad)));
-		label.append(cb, ` ${rec?.name || set?.name || "?"}  #${norad}`);
-		label.className = "name";
-		item.append(label);
+		const name = document.createElement("span");
+		name.className = "name";
+		name.textContent = `${set.name || "?"}  #${n}`;
 		const meta = document.createElement("span");
 		meta.className = "meta";
-		if (!set) meta.append(tag("not in the data", "warn"));
-		else {
-			meta.append(`new set ${ageDays(set.epoch).toFixed(1)} days old   `);
-			meta.append(state === "newer" || state === "new" ? tag(state === "new" ? "to store" : "newer", "ok") : state === "same" ? tag("already current", "") : tag("older than the radio's", "warn"));
-		}
-		if (!rec) {
-			const rm = document.createElement("button");
-			rm.textContent = "Remove";
-			rm.addEventListener("click", () => { added.delete(norad); renderSets(); });
-			item.append(rm);
-		}
-		item.append(meta);
+		meta.append(`set ${ageDays(set.epoch).toFixed(1)} days old, inclination ${o.incl.toFixed(1)}°, period ${o.period_min.toFixed(1)} min, height about ${Math.round(o.alt_km)} km   `);
+		meta.append(st === "new" ? tag("will be stored, with no frequencies", "warn") : st === "newer" ? tag("replaces an older set", "ok") : tag(st === "same" ? "already current: skipped" : "older than the radio's: skipped", ""));
+		item.append(name, meta);
 		box.append(item);
 	}
 }
 
-function addByInput() {
-	const q = $("add-norad").value.trim();
-	if (!q) return;
-	const n = /^\d+$/.test(q) ? Number(q) : null;
-	let norad = n;
-	if (n === null) {
-		const hits = [...tles.entries()].filter(([, s]) => s.name.toLowerCase().includes(q.toLowerCase()));
-		if (hits.length !== 1) {
-			say($("src-msg"), hits.length ? `${hits.length} names match: ${hits.slice(0, 5).map(([k, s]) => `${s.name} (#${k})`).join(", ")}. Use the number.` : "No name matches.", "warn");
-			return;
+function renderSets() {
+	const box = $("sets-list");
+	box.textContent = "";
+	if (!tles.size) {
+		renderCount();
+		return;
+	}
+	const q = $("filter").value.trim().toLowerCase(), only = $("only-picked").checked;
+	const rows = [...tles.entries()].filter(([n, s]) => (!q || s.name.toLowerCase().includes(q) || String(n).includes(q)) && (!only || picked.has(n)))
+		.sort((a, b) => (a[1].name || "~").localeCompare(b[1].name || "~") || a[0] - b[0]);
+	if (!rows.length) {
+		const p = document.createElement("p");
+		p.className = "muted";
+		p.textContent = only && !picked.size ? "Nothing is chosen yet." : "No satellite matches.";
+		box.append(p);
+	}
+	for (const [norad, set] of rows) {
+		const item = document.createElement("div");
+		item.className = "item";
+		const label = document.createElement("label");
+		label.className = "inline name";
+		const cb = document.createElement("input");
+		cb.type = "checkbox";
+		cb.checked = picked.has(norad);
+		cb.addEventListener("change", () => {
+			touched.add(norad);
+			if (cb.checked) picked.add(norad);
+			else picked.delete(norad);
+			renderCount();
+		});
+		label.append(cb, `${set.name || "?"}  #${norad}`);
+		const meta = document.createElement("span");
+		meta.className = "meta";
+		meta.append(`set ${ageDays(set.epoch).toFixed(1)} days old   `);
+		if (stored.length || link) {
+			const st = stateOf(set, norad);
+			if (st === "new") meta.append(tag("not on the radio", ""));
+			else meta.append(st === "newer" ? tag("newer than the radio's", "ok") : st === "same" ? tag("on the radio, current", "") : tag("older than the radio's", "warn"));
 		}
-		norad = hits[0][0];
+		item.append(label, meta);
+		box.append(item);
 	}
-	if (!tles.has(norad)) {
-		say($("src-msg"), `#${norad} is not in the data read.`, "warn");
-		return;
-	}
-	if (stored.length + added.size >= 32 && !stored.some((r) => r.norad === norad)) {
-		say($("src-msg"), "The radio holds 32 satellites: delete one first.", "warn");
-		return;
-	}
-	added.add(norad);
-	$("add-norad").value = "";
-	say($("src-msg"), "", "");
-	renderSets();
+	renderCount();
 }
 
 async function updateRadio() {
 	const ul = $("progress");
 	ul.textContent = "";
-	const choose = new Set();
-	for (const r of stored) if (!unchecked.has(r.norad)) choose.add(r.norad);
-	for (const n of added) choose.add(n);
+	const line = (text, cls = "") => {
+		const li = document.createElement("li");
+		li.textContent = text;
+		li.className = cls;
+		ul.append(li);
+	};
 	let lock = null;
 	try { lock = await navigator.wakeLock?.request("screen"); } catch { /* not allowed: carry on */ }
 	try {
-		const results = await sat.update(link, tles, {
-			add: [...added], choose,
-			onResult: (r) => {
-				const li = document.createElement("li");
-				li.textContent = `${r.label} #${r.norad}: ${r.detail}`;
-				li.className = r.outcome === "failed" ? "bad" : r.outcome === "updated" || r.outcome === "stored" ? "ok" : "";
-				ul.append(li);
-			},
-		});
+		if ($("clock-too").checked) {
+			await setClock();
+			line($("clock-msg").textContent, $("clock-msg").classList.contains("bad") ? "bad" : "ok");
+		}
+		if (!picked.size) return;
+		const have = new Set(stored.map((r) => r.norad));
+		const results = (await sat.update(link, tles, {
+			add: [...picked].filter((n) => !have.has(n)), choose: new Set(picked),
+			onResult: (r) => { if (r.outcome !== "skipped") line(`${r.label} #${r.norad}: ${r.detail}`, r.outcome === "failed" ? "bad" : r.outcome === "updated" || r.outcome === "stored" ? "ok" : ""); },
+		})).filter((r) => r.outcome !== "skipped");
 		const n = results.filter((r) => r.outcome === "updated" || r.outcome === "stored").length;
 		const f = results.filter((r) => r.outcome === "failed").length;
-		const li = document.createElement("li");
-		li.textContent = f ? `${n} updated, ${f} failed.` : n ? `Done: ${n} updated.` : "Nothing needed updating.";
-		li.className = f ? "bad" : "ok";
-		ul.append(li);
-		added.clear();
 		await readStored();
+		line(f ? `${n} written, ${f} failed.` : n ? `Done: ${n} written. The radio's list is below.` : "Nothing needed writing.", f ? "bad" : "ok");
+		$("stored").scrollIntoView?.({ block: "nearest" });
 	} finally {
 		try { await lock?.release(); } catch { /* gone */ }
 	}
@@ -380,16 +409,17 @@ function init() {
 	$("clock-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), setClock));
 	$("stored-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), readStored));
 	for (const b of document.querySelectorAll(".tabs button")) b.addEventListener("click", () => setSource(b.dataset.src));
-	$("net-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), () => download(false)));
-	$("net-force").addEventListener("click", (e) => run(e.target, $("src-msg"), () => download(true)));
+	$("net-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), () => download(true)));
 	$("paste-btn").addEventListener("click", () => useText($("paste-text").value, "pasted"));
 	$("file-in").addEventListener("change", async (e) => {
 		const f = e.target.files[0];
 		if (f) useText(await f.text(), f.name);
 	});
-	$("add-btn").addEventListener("click", addByInput);
-	$("add-norad").addEventListener("keydown", (e) => { if (e.key === "Enter") addByInput(); });
-	$("update-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), updateRadio));
+	$("filter").addEventListener("input", renderSets);
+	$("only-picked").addEventListener("change", renderSets);
+	$("clear-btn").addEventListener("click", () => { for (const n of picked) touched.add(n); picked.clear(); renderSets(); });
+	$("clock-too").addEventListener("change", renderCount);
+	$("update-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), updateRadio));
 	$("rt-btn").addEventListener("click", (e) => run(e.target, $("rt-msg"), retuneRun));
 	$("rt-copy").addEventListener("click", async () => {
 		try { await navigator.clipboard.writeText(retuneText); say($("rt-msg"), "Results copied.", "ok"); } catch { say($("rt-msg"), "Couldn't copy: select the text instead.", "warn"); }
@@ -400,6 +430,8 @@ function init() {
 	});
 	navigator.serial?.addEventListener("disconnect", () => { if (link) disconnect(); });
 	navigator.usb?.addEventListener("disconnect", () => { if (link && how === "usb") disconnect(); });
+	renderSets();
+	download(false);	// a radio isn't needed to see what there is to choose from
 	if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 

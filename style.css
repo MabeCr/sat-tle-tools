@@ -47,3 +47,10 @@ select { font: inherit; width: 100%; padding: 8px; border: 1px solid var(--line)
 .progress .bad { color: var(--bad); }
 .progress .ok { color: var(--ok); }
 footer { padding-bottom: 2rem; font-size: 0.9rem; }
+label.inline { display: flex; gap: 8px; align-items: center; }
+label.inline input[type="checkbox"], .pick input[type="checkbox"] { width: 1.4rem; height: 1.4rem; flex: none; }
+.pick { max-height: 26rem; overflow-y: auto; border-top: 1px solid var(--line); }
+.pick .item { grid-template-columns: 1fr; }
+details#preview, details#advanced { margin: 10px 0; }
+details#advanced { margin: 14px 0; }
+summary { cursor: pointer; padding: 10px 0; min-height: 44px; }

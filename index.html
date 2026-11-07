@@ -15,43 +15,22 @@
 <body>
 <header>
 	<h1>Satellite TLE tool</h1>
-	<p class="lead">Update a radio's satellite element sets, set its clock and read its diagnostics over the programming cable.</p>
+	<p class="lead">Pick the satellites you want, then write their orbit data and the time to the radio over the programming cable.</p>
 </header>
 <main>
 <p id="unsupported" class="notice warn" hidden>This browser can't talk to a serial port. Use Chrome or Edge, on a computer or on an Android phone with the cable on an OTG adapter.</p>
 
-<section id="connect">
-	<h2>1. Radio</h2>
-	<div class="row"><button id="connect-btn" class="primary">Connect radio</button><button id="connect-alt-btn">Other serial port</button><button id="disconnect-btn" hidden>Disconnect</button></div>
-	<p id="radio-info" class="muted">Plug the cable into the radio and the phone, switch the radio on, press Connect and choose the cable.</p>
-	<p id="connect-help" class="muted" hidden>No cable was chosen, or the list was empty. The cable must be in the phone's OTG adapter with the radio switched on. Close every other tab and app that may hold the cable (the RadioFoundry page, a terminal), unplug and plug the cable in again, and try again. A phone sees an FTDI cable through <b>Connect radio (USB cable)</b>; a cable the phone lists as a serial port (and Bluetooth serial ports) are under <b>Other serial port</b>.</p>
-</section>
-
-<section id="clock" hidden>
-	<h2>2. Clock</h2>
-	<p>The radio's clock is lost when it is switched off unless it has a battery-backed clock, and a GPS fix needs open sky. Set it from this device.</p>
-	<p id="clock-phone" class="mono"></p>
-	<p id="clock-radio" class="muted"></p>
-	<div class="row"><button id="clock-btn">Set the radio's clock from this device</button></div>
-	<p id="clock-msg" class="muted" role="status"></p>
-</section>
-
-<section id="stored" hidden>
-	<h2>3. Satellites on the radio</h2>
-	<div id="stored-list"></div>
-	<div class="row"><button id="stored-btn">Read again</button></div>
-</section>
-
-<section id="update" hidden>
-	<h2>4. Update element sets</h2>
+<section id="source">
+	<h2>1. Get element sets</h2>
+	<p class="muted">Element sets (TLEs) are the orbit data the radio needs. They are downloaded from CelesTrak's amateur radio group when this page opens: no radio is needed for the first two steps.</p>
 	<div class="tabs" role="tablist">
 		<button role="tab" data-src="net" aria-selected="true">Download</button>
 		<button role="tab" data-src="paste" aria-selected="false">Paste</button>
 		<button role="tab" data-src="file" aria-selected="false">File</button>
 	</div>
 	<div id="src-net" class="src">
-		<p class="muted">CelesTrak's amateur radio group. Sets are kept in this browser; the download is repeated no sooner than every two hours unless you ask.</p>
-		<div class="row"><button id="net-btn">Get element sets</button><button id="net-force" hidden>Download again</button></div>
+		<p class="muted">Sets are kept in this browser; the page repeats the download no sooner than every two hours unless you ask.</p>
+		<div class="row"><button id="net-btn">Download again</button></div>
 	</div>
 	<div id="src-paste" class="src" hidden>
 		<textarea id="paste-text" rows="6" spellcheck="false" placeholder="ISS (ZARYA)&#10;1 25544U 98067A ...&#10;2 25544 ..."></textarea>
@@ -61,18 +40,47 @@
 		<label class="file">Choose a text file of element sets <input type="file" id="file-in" accept=".txt,.tle,text/plain"></label>
 	</div>
 	<p id="src-msg" class="muted" role="status"></p>
+</section>
 
-	<div id="sets" hidden>
-		<h3>Element sets found</h3>
-		<div id="sets-list"></div>
-		<div class="row add"><label>Add by catalog number <input id="add-norad" inputmode="numeric" pattern="[0-9]*" placeholder="e.g. 44909"></label><button id="add-btn">Add</button></div>
-		<div class="row"><button id="update-btn" class="primary">Update the radio</button></div>
+<section id="choose" hidden>
+	<h2>2. Choose satellites</h2>
+	<p class="muted">Tick the satellites to write. The radio holds 32.</p>
+	<div class="row"><label>Search <input id="filter" type="search" placeholder="name or catalog number" autocomplete="off"></label></div>
+	<div class="row"><label class="inline"><input type="checkbox" id="only-picked"> Show only the chosen</label><button id="clear-btn">Clear choices</button></div>
+	<p id="count" class="muted" role="status"></p>
+	<div id="sets-list" class="pick"></div>
+	<details id="preview">
+		<summary>Preview what will be written</summary>
+		<div id="preview-list"></div>
+	</details>
+</section>
+
+<section id="connect">
+	<h2>3. Write to the radio</h2>
+	<div class="row"><button id="connect-btn" class="primary">Connect radio</button><button id="connect-alt-btn">Other serial port</button><button id="disconnect-btn" hidden>Disconnect</button></div>
+	<p id="radio-info" class="muted">Plug the cable into the radio and the phone, switch the radio on, press Connect and choose the cable.</p>
+	<p id="connect-help" class="muted" hidden>No cable was chosen, or the list was empty. The cable must be in the phone's OTG adapter with the radio switched on. Close every other tab and app that may hold the cable (the RadioFoundry page, a terminal), unplug and plug the cable in again, and try again. A phone sees an FTDI cable through <b>Connect radio (USB cable)</b>; a cable the phone lists as a serial port (and Bluetooth serial ports) are under <b>Other serial port</b>.</p>
+	<div id="write" hidden>
+		<p id="clock-phone" class="mono"></p>
+		<p id="clock-radio" class="muted"></p>
+		<div class="row"><label class="inline"><input type="checkbox" id="clock-too" checked> Set the radio's clock from this device too (tracking needs the time, and the radio refuses one before 2026)</label></div>
+		<div class="row"><button id="update-btn" class="primary">Write to the radio</button><button id="clock-btn">Set the clock only</button></div>
+		<p id="clock-msg" class="muted" role="status"></p>
 		<ul id="progress" class="progress" aria-live="polite"></ul>
 	</div>
 </section>
 
-<section id="retune" hidden>
-	<h2>5. Retune test</h2>
+<section id="stored" hidden>
+	<h2>4. On the radio</h2>
+	<p class="muted">What the radio holds now. It is read when you connect, so you can look before writing, and again after a write.</p>
+	<div id="stored-list"></div>
+	<div class="row"><button id="stored-btn">Read again</button></div>
+</section>
+
+<details id="advanced" hidden>
+<summary>Advanced: retune test and diagnostics</summary>
+<section id="retune">
+	<h2>Retune test</h2>
 	<p>How long the receiver takes to settle after each retune, which decides how Doppler correction can be done. <b>Receive only: nothing is transmitted.</b>
 		Put the radio on an FM channel or the VFO first, and use a steady FM carrier, such as a NOAA weather channel.</p>
 	<div class="grid">
@@ -88,12 +96,13 @@
 	<pre id="rt-out" class="mono" hidden></pre>
 </section>
 
-<section id="diag" hidden>
-	<h2>6. Diagnostics</h2>
+<section id="diag">
+	<h2>Diagnostics</h2>
 	<p class="muted">Read only. Nothing here changes the radio.</p>
 	<div class="row"><button id="diag-btn">Read diagnostics</button><button id="diag-copy" hidden>Copy report</button></div>
 	<pre id="diag-out" class="mono" hidden></pre>
 </section>
+</details>
 </main>
 <footer>
 	<p class="muted">Nothing about the radio is sent anywhere. The only request this page makes is the element set download. MIT licensed.</p>

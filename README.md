@@ -28,6 +28,14 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
    - Diagnostics: read-only: version, tasks (free heap and stack), the last crash record, the satellite store and the
      orbit model's speed. *Copy report* puts it on the clipboard for a bug report.
 
+**When CelesTrak can't be reached.** The page tries CelesTrak first. If that fails (the site is down, answers badly or
+doesn't reply within 8 seconds), it falls back to this site's own copy, `tle/amateur.txt`, and says so, with how old the
+copy is. The copy is kept by a GitHub Action (`.github/workflows/tle-mirror.yml`) that downloads CelesTrak's amateur group
+every six hours from GitHub's servers, checks that it parses, and commits it when it changed; a failed download keeps the
+copy that is there. Run it by hand from the repository's Actions tab (*tle-mirror*, *Run workflow*), for example after
+turning this on the first time. The page still keeps the last download in the browser, and Paste and File still work. To add
+another source, add it to `SAT_TLE_SOURCES` in `lib/source.js` (a host that allows cross-origin requests from the page).
+
 **Connecting from a phone.** Chrome on Android gives Web Serial only to USB devices of the standard serial class (and to
 Bluetooth serial ports), so an FTDI programming cable doesn't appear in its serial port list. The page therefore talks to
 an FTDI cable (FT232R, FT231X and the like) directly over WebUSB on Android: use **Connect radio (USB cable)**. **Other

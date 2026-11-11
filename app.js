@@ -6,7 +6,8 @@ import { Link, LinkError } from "./lib/link.js";
 import { FtdiStream, errorText as usbErrorText, usbSupported } from "./lib/ftdi.js";
 import { SerialStream, errorText, serialSupported } from "./lib/serial.js";
 import * as sat from "./lib/sat.js";
-import { SAT_TLE_URL, compare, orbit, parse } from "./lib/tle.js";
+import { fetchSets } from "./lib/source.js";
+import { compare, orbit, parse } from "./lib/tle.js";
 
 const $ = (id) => document.getElementById(id);
 const CACHE_KEY = "sat-web.tle";
@@ -197,11 +198,9 @@ async function download(force) {
 		return;
 	}
 	say($("src-msg"), "Downloading…");
-	let text;
+	let got;
 	try {
-		const r = await fetch(SAT_TLE_URL, { cache: "no-store" });
-		if (!r.ok) throw new Error(`the server answered ${r.status}`);
-		text = await r.text();
+		got = await fetchSets();
 	} catch (e) {
 		if (cached) {
 			useText(cached.text, "the last download: this one failed");
@@ -210,8 +209,18 @@ async function download(force) {
 		say($("src-msg"), `Couldn't download (${e.message}). Paste the text or choose a file instead: celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle`, "bad");
 		return;
 	}
+	const { text, source, fetched } = got;
+	// A copy kept on this site stands in when CelesTrak can't be reached: say so, and how old it is
+	let from = "downloaded now";
+	let old = false;
+	if (source.id === "mirror") {
+		const h = fetched === null ? null : (Date.now() / 1000 - fetched) / 3600;
+		from = `CelesTrak could not be reached: ${source.name}${h === null ? "" : `, taken ${h < 1 ? "under an hour" : `${Math.round(h)} hours`} ago`}`;
+		old = h !== null && h > 36;
+	}
 	try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), text })); } catch { /* full or private */ }
-	useText(text, "downloaded now");
+	useText(text, from);
+	if (old) say($("src-msg"), `${$("src-msg").textContent} The copy is old: check the sets' ages below.`, "warn");
 }
 
 // Step 2: every set read, by name; the ticked ones are what step 3 writes

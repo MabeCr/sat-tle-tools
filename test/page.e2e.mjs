@@ -195,6 +195,28 @@ assert.deepEqual(errors, []);
 	assert.deepEqual(phoneErrors, []);
 	await phone.close();
 }
+// CelesTrak down: this site's copy stands in, with its age; and with both down the message says what to do
+{
+	const fb = await browser.newPage({ viewport: { width: 390, height: 844 } });
+	await fb.route("https://celestrak.org/**", (r) => r.abort());
+	await fb.route("**/tle/amateur.txt", celestrak);
+	await fb.route("**/tle/mirror.json", (r) => r.fulfill({ status: 200, contentType: "application/json",
+		body: JSON.stringify({ fetched: new Date(Date.now() - 3 * 3600e3).toISOString() }) }));
+	await fb.goto(url);
+	await fb.waitForSelector("#sets-list .item");
+	assert.match(await fb.locator("#src-msg").innerText(), /3 element sets read \(CelesTrak could not be reached: this site's copy, taken 3 hours ago\)/);
+	await fb.close();
+	const none = await browser.newPage({ viewport: { width: 390, height: 844 } });
+	await none.route("https://celestrak.org/**", (r) => r.abort());
+	await none.route("**/tle/amateur.txt", (r) => r.fulfill({ status: 404, body: "not found" }));
+	await none.goto(url);
+	await none.waitForFunction(() => /Couldn't download/.test(document.getElementById("src-msg").textContent));
+	const msg = await none.locator("#src-msg").innerText();
+	assert.match(msg, /CelesTrak: .*; this site's copy: the server answered 404/);
+	assert.match(msg, /Paste the text or choose a file/);
+	assert.equal(await none.locator("#choose").isHidden(), true);
+	await none.close();
+}
 await browser.close();
 server.close();
 console.log("page.e2e: ok");

@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: MIT
+# A copy of CelesTrak's amateur element sets kept on this site (tle/amateur.txt, tle/mirror.json) for the page to fall back
+# on when CelesTrak can't be reached from the browser (lib/source.js). Taken from GitHub's servers every six hours: CelesTrak
+# asks for no more than one download of a group every two hours. A failed download keeps the copy that is there.
+name: tle-mirror
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tle-mirror
+
+jobs:
+  mirror:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Download, check and commit when the sets changed
+        run: |
+          url="https://celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle"
+          if ! curl -fsSL --retry 3 --retry-delay 30 --max-time 60 \
+               -A "sat-tle-tools mirror (https://github.com/MabeCr/sat-tle-tools)" "$url" -o /tmp/amateur.txt; then
+            echo "::warning::CelesTrak could not be reached: the copy stays as it is"
+            exit 0
+          fi
+          # Only element sets that parse (the page's own rules) are kept: an error page or a cut download is not
+          sets=$(node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            import { parse } from "./lib/tle.js";
+            console.log(parse(readFileSync("/tmp/amateur.txt", "utf8")).size);
+          ')
+          if [ "${sets:-0}" -lt 10 ]; then
+            echo "::warning::the download holds ${sets:-0} element sets, not a usable list: the copy stays as it is"
+            exit 0
+          fi
+          mkdir -p tle
+          if cmp -s /tmp/amateur.txt tle/amateur.txt; then
+            echo "unchanged"
+            exit 0
+          fi
+          cp /tmp/amateur.txt tle/amateur.txt
+          printf '{"fetched": "%s", "sets": %s, "source": "celestrak.org amateur group"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$sets" > tle/mirror.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tle
+          git commit -m "Mirror: element sets of $(date -u +%Y-%m-%d\ %H:%M) UTC ($sets sets)"
+          git push

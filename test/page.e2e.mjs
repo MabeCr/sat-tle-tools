@@ -105,6 +105,9 @@ await page.click("#update-btn");
 await page.waitForFunction(() => /Done:|Nothing needed|failed/.test(document.getElementById("progress").textContent));
 const progress = await text("#progress");
 assert.match(progress, /Radio clock set to 20\d\d-/);
+// the device's time zone went with the clock (the browser's own: whatever it is here)
+assert.equal(await page.evaluate(() => window.__radio.zone), await page.evaluate(() => Math.round(-new Date().getTimezoneOffset() / 15) * 15 + 0));
+assert.match(progress, /time zone UTC/);
 assert.match(progress, /ISS.*updated/);
 assert.match(progress, /RS-44.*stored/);
 assert.doesNotMatch(progress, /SO-50/);

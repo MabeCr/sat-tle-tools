@@ -18,7 +18,8 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 3. **Write to the radio**: plug the cable into the radio and the device, switch the radio on, **Connect radio** and
    choose the cable. Satellites already on the radio whose data has a newer set are ticked for you. *Write to the radio*
    sets the clock too (the box is ticked by default; the radio refuses a time before 2026) and then stores the chosen
-   satellites. A satellite that wasn't on the radio is stored with no frequencies.
+   satellites. It sends this device's time zone with the clock (daylight saving included, to the nearest 15 minutes), so the
+   radio's pass times are local; a radio whose firmware can't take the zone yet gets the clock alone and the page says so. A satellite that wasn't on the radio is stored with no frequencies.
 4. **On the radio**: what the radio holds, read when you connect (so you can look before writing) and again after a
    write. *Delete* removes one.
 5. **Advanced**: the *retune test* and *diagnostics*.

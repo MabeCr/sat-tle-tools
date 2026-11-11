@@ -101,6 +101,35 @@ test("a build without satellites lists nothing", async () => {
 	assert.deepEqual(await sat.list(link(r)), []);
 });
 
+test("a zone with the clock: the setting is written, and a firmware from before it gets the clock alone", async () => {
+	const r = new FakeRadio({ store: V.store });
+	assert.equal(await sat.setClock(link(r), 1793196300, -360), true);
+	assert.equal(r.clock, 1793196300);
+	assert.equal(r.zone, -360);
+	const old = new FakeRadio({ store: V.store, noZone: true });
+	assert.equal(await sat.setClock(link(old), 1793196400, 330), false);
+	assert.equal(old.clock, 1793196400);
+	assert.equal(old.zone, null);
+	assert.equal(await sat.setClock(link(r), 1793196500, null), false);	// no zone to send: the clock alone, the setting stays
+	assert.equal(r.clock, 1793196500);
+	assert.equal(r.zone, -360);
+	// the radio refuses one off its grid (the page rounds to 15 minutes first): that is no reason to fall back, it is an error
+	await assert.rejects(() => sat.setTime(link(r), 1793196600, 100), (e) => e.status === 2);
+	assert.equal(r.zone, -360);
+});
+
+test("the device's zone: minutes to the nearest 15, daylight saving as the date says", () => {
+	const at = (off) => ({ getTimezoneOffset: () => off });	// JS: minutes to add to local time to get UTC
+	assert.equal(sat.zoneMinutes(at(360)), -360);	// UTC-6
+	assert.equal(sat.zoneMinutes(at(300)), -300);	// UTC-5, the same place in summer
+	assert.equal(sat.zoneMinutes(at(-345)), 345);	// Nepal
+	assert.equal(sat.zoneMinutes(at(0)), 0);
+	assert.equal(sat.zoneMinutes(at(-1000)), null);	// past +14:00
+	assert.equal(sat.zoneName(-360), "UTC-6");
+	assert.equal(sat.zoneName(345), "UTC+5:45");
+	assert.equal(sat.zoneName(0), "UTC");
+});
+
 test("set the clock, delete, bench and clear", async () => {
 	const r = new FakeRadio({ store: V.store });
 	const l = link(r);

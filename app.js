@@ -108,9 +108,11 @@ async function setClock() {
 		say($("clock-msg"), "This device's clock is before 2026: not setting the radio from it.", "bad");
 		return;
 	}
-	await sat.setTime(link, now);
+	// The device knows its own offset, daylight saving included: the radio gets it too, so its times are local
+	const zone = sat.zoneMinutes();
+	const zoneSet = await sat.setClock(link, now, zone);
 	await readClock();
-	say($("clock-msg"), `Radio clock set to ${when(Math.floor(now))}.`, "ok");
+	say($("clock-msg"), `Radio clock set to ${when(Math.floor(now))}${zoneSet ? `; time zone ${sat.zoneName(zone)}` : zone === null ? "" : ". Its firmware can't take the time zone yet: set it on the radio (Settings > Location)"}.`, "ok");
 }
 
 // --- stored satellites ---

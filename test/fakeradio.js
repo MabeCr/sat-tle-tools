@@ -15,7 +15,7 @@ const PROFILES = {	// the radio's own profiles (core/sat/sat_profile.c): the one
 };
 
 export class FakeRadio {
-	constructor({ slots = 32, sat = true, store = [], clock = 1793196300 } = {}) {
+	constructor({ slots = 32, sat = true, store = [], clock = 1793196300, noZone = false } = {}) {
 		this.buf = new Uint8Array(0);
 		this.slots = slots;
 		this.sat = sat;
@@ -24,6 +24,8 @@ export class FakeRadio {
 		this.lines = { 1: Array(69).fill(" "), 2: Array(69).fill(" ") };
 		this.loaded = null;
 		this.clock = clock;
+		this.noZone = noZone;	// a firmware from before the time zone in TIME
+		this.zone = null;	// the Time zone setting, once set
 		this.calls = [];	// every SAT request, for the tests: {op, ...}
 		this.crash = null;
 		this.stuck = false;	// answer nothing
@@ -80,6 +82,15 @@ export class FakeRadio {
 			return this.ok(new Uint8Array([0, 0]), le32(this.loaded.norad));
 		}
 		case 4:
+			// unix u32, optionally a zone i16 (minutes from UTC, a multiple of 15): the Time zone setting; a radio from before
+			// it (opts.noZone) refuses the longer request
+			if (p.length === 7) {
+				const z = new DataView(p.buffer, p.byteOffset + 5, 2).getInt16(0, true);
+				if (this.noZone || z < -720 || z > 840 || z % 15 !== 0) return this.status(2);
+				this.zone = z;
+			} else if (p.length !== 5) {
+				return this.status(2);
+			}
 			this.clock = u32le(p, 1);
 			return this.ok();
 		case 7:

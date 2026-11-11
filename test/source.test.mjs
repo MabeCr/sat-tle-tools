@@ -27,10 +27,11 @@ test("a source that fails hands over to the next, and a mirror's date is read fr
 	const r = await fetchSets(srcs, opts(async (u) => {
 		if (u === "https://a/x") throw new TypeError("Failed to fetch");
 		if (u === "https://b/x") return ok(GOOD);
-		return ok(JSON.stringify({ fetched: "2026-11-11T06:23:00Z" }));
+		return ok(JSON.stringify({ fetched: "2026-11-11T06:23:00Z", source: "AMSAT" }));
 	}));
 	assert.equal(r.source.id, "b");
 	assert.equal(r.fetched, Date.UTC(2026, 10, 11, 6, 23, 0) / 1000);
+	assert.equal(r.via, "AMSAT");
 });
 
 test("a bad status, and an answer that is not element sets, fall through too", async () => {
@@ -38,7 +39,8 @@ test("a bad status, and an answer that is not element sets, fall through too", a
 	assert.equal(r.source.id, "b");
 	r = await fetchSets(srcs, opts(async (u) => (u === "https://a/x" ? ok("<html>maintenance</html>") : ok(GOOD))));
 	assert.equal(r.source.id, "b");
-	assert.equal(r.fetched, null);	// no meta file: no date
+	assert.equal(r.fetched, null);	// no meta file: no date, no list named
+	assert.equal(r.via, "");
 });
 
 test("silence is given up on after the timeout", async () => {

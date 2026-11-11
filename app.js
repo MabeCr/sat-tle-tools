@@ -209,13 +209,13 @@ async function download(force) {
 		say($("src-msg"), `Couldn't download (${e.message}). Paste the text or choose a file instead: celestrak.org/NORAD/elements/gp.php?GROUP=amateur&FORMAT=tle`, "bad");
 		return;
 	}
-	const { text, source, fetched } = got;
+	const { text, source, fetched, via } = got;
 	// A copy kept on this site stands in when CelesTrak can't be reached: say so, and how old it is
 	let from = "downloaded now";
 	let old = false;
 	if (source.id === "mirror") {
 		const h = fetched === null ? null : (Date.now() / 1000 - fetched) / 3600;
-		from = `CelesTrak could not be reached: ${source.name}${h === null ? "" : `, taken ${h < 1 ? "under an hour" : `${Math.round(h)} hours`} ago`}`;
+		from = `CelesTrak could not be reached: ${source.name}${via ? ` from ${via}` : ""}${h === null ? "" : `, taken ${h < 1 ? "under an hour" : `${Math.round(h)} hours`} ago`}`;
 		old = h !== null && h > 36;
 	}
 	try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), text })); } catch { /* full or private */ }

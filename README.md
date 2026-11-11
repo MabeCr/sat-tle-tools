@@ -30,9 +30,11 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 
 **When CelesTrak can't be reached.** The page tries CelesTrak first. If that fails (the site is down, answers badly or
 doesn't reply within 8 seconds), it falls back to this site's own copy, `tle/amateur.txt`, and says so, with how old the
-copy is. The copy is kept by a GitHub Action (`.github/workflows/tle-mirror.yml`) that downloads CelesTrak's amateur group
-every six hours from GitHub's servers, checks that it parses, and commits it when it changed; a failed download keeps the
-copy that is there. Run it by hand from the repository's Actions tab (*tle-mirror*, *Run workflow*), for example after
+copy is, and which list it came from. The copy is kept by a GitHub Action (`.github/workflows/tle-mirror.yml`) that downloads
+CelesTrak's amateur group every six hours from GitHub's servers, checks that it parses, and commits it when it changed.
+If CelesTrak can't be reached it takes [AMSAT's list](https://www.amsat.org/tle/current/nasabare.txt) instead (AMSAT sends no
+cross-origin header, so a browser page can't read it directly, but the Action can). When neither works, the copy that is
+there stays. Run it by hand from the repository's Actions tab (*tle-mirror*, *Run workflow*), for example after
 turning this on the first time. The page still keeps the last download in the browser, and Paste and File still work. To add
 another source, add it to `SAT_TLE_SOURCES` in `lib/source.js` (a host that allows cross-origin requests from the page).
 

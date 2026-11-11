@@ -201,10 +201,10 @@ assert.deepEqual(errors, []);
 	await fb.route("https://celestrak.org/**", (r) => r.abort());
 	await fb.route("**/tle/amateur.txt", celestrak);
 	await fb.route("**/tle/mirror.json", (r) => r.fulfill({ status: 200, contentType: "application/json",
-		body: JSON.stringify({ fetched: new Date(Date.now() - 3 * 3600e3).toISOString() }) }));
+		body: JSON.stringify({ fetched: new Date(Date.now() - 3 * 3600e3).toISOString(), source: "AMSAT" }) }));
 	await fb.goto(url);
 	await fb.waitForSelector("#sets-list .item");
-	assert.match(await fb.locator("#src-msg").innerText(), /3 element sets read \(CelesTrak could not be reached: this site's copy, taken 3 hours ago\)/);
+	assert.match(await fb.locator("#src-msg").innerText(), /3 element sets read \(CelesTrak could not be reached: this site's copy from AMSAT, taken 3 hours ago\)/);
 	await fb.close();
 	const none = await browser.newPage({ viewport: { width: 390, height: 844 } });
 	await none.route("https://celestrak.org/**", (r) => r.abort());

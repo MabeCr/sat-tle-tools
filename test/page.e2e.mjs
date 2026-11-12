@@ -88,6 +88,24 @@ await page.uncheck("#only-picked");
 await page.click("#preview summary");
 assert.match(await text("#preview-list"), /RS-44.*inclination 82\.5°, period 113\.4 min, height about 13\d\d km.*stored, with no frequencies/s);
 
+// by sound, with no radio: the chosen set as audio (a download), and played and stopped
+assert.match(await text("#sound-info"), /1 chosen: about \d+ seconds, every satellite sent twice/);
+const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#sound-save")]);
+assert.equal(dl.suggestedFilename(), "satellites-1.wav");
+const wav = await readFile(await dl.path());
+assert.equal(wav.subarray(0, 4).toString(), "RIFF");
+assert.equal(wav.subarray(8, 12).toString(), "WAVE");
+assert.ok(wav.length > 200000, `a WAV of ${wav.length} bytes`);
+assert.match(await text("#sound-msg"), /Saved 1 satellites as a sound of \d+ seconds/);
+await page.click("#sound-play");
+await page.waitForSelector("#sound-stop:not([hidden])");
+assert.match(await text("#sound-info"), /Playing: \d+ of \d+ seconds/);
+assert.equal(await page.locator("#sound-play").isDisabled(), true);
+await page.click("#sound-stop");
+await page.waitForFunction(() => /Stopped/.test(document.getElementById("sound-msg").textContent));
+assert.equal(await page.locator("#sound-stop").isHidden(), true);
+assert.equal(await page.locator("#sound-play").isDisabled(), false);
+
 // 3: connect; the radio's satellites are listed (step 4) before anything is written, and its ISS (older data) starts ticked
 await page.click("#connect-btn");
 await page.waitForSelector("#stored-list .item");
@@ -120,6 +138,9 @@ await page.screenshot({ path: process.argv[2] || "/tmp/sat-web-page.png", fullPa
 // the clock alone, with nothing chosen
 await page.click("#clear-btn");
 assert.match(await text("#count"), /0 chosen/);
+assert.match(await text("#sound-info"), /Nothing is chosen yet/);
+assert.equal(await page.locator("#sound-play").isDisabled(), true);
+assert.equal(await page.locator("#sound-save").isDisabled(), true);
 await page.uncheck("#clock-too");
 assert.equal(await page.locator("#update-btn").isDisabled(), true);
 await page.check("#clock-too");

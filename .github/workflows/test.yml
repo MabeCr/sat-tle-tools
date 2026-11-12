@@ -46,3 +46,13 @@ jobs:
             exit 1
           fi
           echo "vectors agree"
+      - name: test/sound_vectors.json is the firmware repository's tests/data/sat_sound_vectors.json
+        run: |
+          url=https://raw.githubusercontent.com/MabeCr/RadioFoundry-sat-firmware/main/tests/data/sat_sound_vectors.json
+          curl -fsSL "$url" -o /tmp/firmware-sound-vectors.json
+          if ! cmp -s /tmp/firmware-sound-vectors.json test/sound_vectors.json; then
+            echo "::error::test/sound_vectors.json differs from the firmware repository's tests/data/sat_sound_vectors.json: copy that file here and make the tests pass"
+            diff <(python3 -m json.tool /tmp/firmware-sound-vectors.json) <(python3 -m json.tool test/sound_vectors.json) | head -30
+            exit 1
+          fi
+          echo "sound vectors agree"

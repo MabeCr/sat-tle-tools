@@ -20,6 +20,11 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
    sets the clock too (the box is ticked by default; the radio refuses a time before 2026) and then stores the chosen
    satellites. It sends this device's time zone with the clock (daylight saving included, to the nearest 15 minutes), so the
    radio's pass times are local; a radio whose firmware can't take the zone yet gets the clock alone and the page says so. A satellite that wasn't on the radio is stored with no frequencies.
+   **Or send by sound** (no cable): the page plays the satellites chosen in step 2 as an audio signal, so a phone's speaker
+   held at the radio's microphone can carry them. *Play to the radio* plays it; *Download the audio (WAV)* saves it to play from
+   any player. Each satellite is one frame of 1200 baud AFSK and the whole list is sent twice, about 90 seconds for 32.
+   It needs a radio whose firmware can receive it, which is still being written; the signal is specified in the firmware
+   repository's `docs/spec/sound-transfer.md`. Only the satellites you chose are sent, up to 32.
 4. **On the radio**: what the radio holds, read when you connect (so you can look before writing) and again after a
    write. *Delete* removes one.
 5. **Advanced**: the *retune test* and *diagnostics*.
@@ -78,13 +83,14 @@ the firmware repository's every week.
 This repository is the only copy of the page. It began as `tools/sat-web` in the RadioFoundry firmware work on satellite
 tracking (<https://github.com/MabeCr/RadioFoundry-sat-firmware>, MIT licensed), which no longer holds it. The page applies
 the same rules to element sets as that repository's host tool (`tools/rfoundry_debug.py sat update`), and
-`test/vectors.json` is how the two agree: the host tool produces `tests/data/sat_update_vectors.json` there
+`test/vectors.json` is how the two agree (and `test/sound_vectors.json`, from `tests/data/sat_sound_vectors.json` and `tools/sat_sound.py`, for the sound): the host tool produces `tests/data/sat_update_vectors.json` there
 (`tools/sat_vectors.py`), this copy must be identical, and the CI here fails when it isn't. To change the update rules,
 change the host tool, regenerate the vectors, copy the file here, and make the tests pass.
 
 | File | What |
 |---|---|
 | `lib/tle.js` | check digits, catalog numbers (Alpha-5), epochs, parsing, "newer or not" |
+| `lib/sound.js` | the sets as sound: the frame, HDLC and AFSK, a WAV file, playing it (the same frames and tone bits as the firmware repository's `tools/sat_sound.py`) |
 | `lib/frame.js`, `lib/link.js` | the radio's debug link: frames, requests, version, view sections |
 | `lib/sat.js` | the SAT command and the update loop (the same rules as `rfoundry_debug.py sat update`) |
 | `lib/serial.js` | Web Serial as a byte stream |

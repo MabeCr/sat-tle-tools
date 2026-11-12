@@ -7,6 +7,7 @@ import { FtdiStream, errorText as usbErrorText, usbSupported } from "./lib/ftdi.
 import { SerialStream, errorText, serialSupported } from "./lib/serial.js";
 import * as sat from "./lib/sat.js";
 import { fetchSets } from "./lib/source.js";
+import * as sound from "./lib/sound.js";
 import { compare, orbit, parse } from "./lib/tle.js";
 
 const $ = (id) => document.getElementById(id);
@@ -22,6 +23,7 @@ let tles = new Map();		// the element sets read from the source
 const picked = new Set();	// catalog numbers the user chose to write
 const touched = new Set();	// ones the user ticked or cleared themselves: a connect doesn't change those
 const SLOTS = 32;		// what the radio holds
+let playing = null;		// the sound being played (lib/sound.js playAudio), if any
 
 function say(el, text, cls = "") {
 	el.textContent = text;
@@ -235,6 +237,7 @@ function renderCount() {
 	say($("count"), `${picked.size} chosen. ${link ? `${used} of ${SLOTS} places on the radio used after writing.` : `The radio holds ${SLOTS}.`}`, used > SLOTS ? "bad" : "");
 	$("update-btn").disabled = used > SLOTS || (!picked.size && !$("clock-too").checked);
 	renderPreview();
+	renderSound();
 }
 
 function stateOf(set, norad) {
@@ -403,6 +406,60 @@ async function diagnostics() {
 	$("diag-copy").hidden = false;
 }
 
+// Or by sound: the chosen sets, in the order the preview lists them, played at the radio's microphone or saved as a file
+function soundSets() {
+	return [...picked].filter((n) => tles.has(n)).map((n) => tles.get(n))
+		.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+}
+
+function renderSound() {
+	const sets = soundSets(), n = sets.length;
+	$("sound-play").disabled = !n || n > SLOTS || !!playing;
+	$("sound-save").disabled = !n || n > SLOTS;
+	if (playing) return;
+	if (!n) say($("sound-info"), "Nothing is chosen yet: tick satellites in step 2.");
+	else if (n > SLOTS) say($("sound-info"), `${n} chosen: a sound carries ${SLOTS} at most. Choose fewer.`, "bad");
+	else say($("sound-info"), `${n} chosen: about ${Math.round(sound.seconds(sets))} seconds, every satellite sent twice.`);
+}
+
+function playSound() {
+	const sets = soundSets();
+	try {
+		playing = sound.playAudio(sets);
+	} catch (e) {
+		say($("sound-msg"), e.message, "bad");
+		return;
+	}
+	const p = playing;
+	$("sound-stop").hidden = false;
+	$("sound-play").disabled = true;
+	$("sound-save").disabled = true;
+	const tick = () => say($("sound-info"), `Playing: ${Math.min(Math.round(p.elapsed()), Math.round(p.seconds))} of ${Math.round(p.seconds)} seconds. Keep the speaker at the microphone and the room quiet.`);
+	tick();
+	const timer = setInterval(tick, 500);
+	p.done.then((how) => {
+		clearInterval(timer);
+		playing = null;
+		$("sound-stop").hidden = true;
+		renderSound();
+		say($("sound-msg"), how === "stopped" ? "Stopped." : "Finished. What the radio heard is on its own screen.", how === "stopped" ? "warn" : "ok");
+	});
+}
+
+function saveSound() {
+	const sets = soundSets();
+	const { samples, rate, seconds } = sound.encode(sets, { rate: 48000 });
+	const url = URL.createObjectURL(new Blob([sound.toWav(samples, rate)], { type: "audio/wav" }));
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = `satellites-${sets.length}.wav`;
+	document.body.append(a);
+	a.click();
+	a.remove();
+	setTimeout(() => URL.revokeObjectURL(url), 10000);
+	say($("sound-msg"), `Saved ${sets.length} satellites as a sound of ${Math.round(seconds)} seconds. Play it at the radio's microphone from any player.`, "ok");
+}
+
 // --- start ---
 
 function init() {
@@ -431,6 +488,9 @@ function init() {
 	$("clear-btn").addEventListener("click", () => { for (const n of picked) touched.add(n); picked.clear(); renderSets(); });
 	$("clock-too").addEventListener("change", renderCount);
 	$("update-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), updateRadio));
+	$("sound-play").addEventListener("click", playSound);
+	$("sound-stop").addEventListener("click", () => playing?.stop());
+	$("sound-save").addEventListener("click", (e) => run(e.target, $("sound-msg"), async () => saveSound()));
 	$("rt-btn").addEventListener("click", (e) => run(e.target, $("rt-msg"), retuneRun));
 	$("rt-copy").addEventListener("click", async () => {
 		try { await navigator.clipboard.writeText(retuneText); say($("rt-msg"), "Results copied.", "ok"); } catch { say($("rt-msg"), "Couldn't copy: select the text instead.", "warn"); }

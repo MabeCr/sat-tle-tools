@@ -132,6 +132,12 @@ export class FakeRadio {
 			}
 			return this.ok(new Uint8Array([st, st === 4 ? this.retuneWhy || 3 : 0, n]), le16(0xFFBA), le16(0xFFB7), new Uint8Array([20]), ...hops);
 		}
+		case 10: {	// RECALL: a stored satellite becomes the loaded one
+			const r = this.rows.find((x) => x && x.norad === u32le(p, 1));
+			if (!r) return this.status(4);
+			this.loaded = { norad: r.norad, epoch: r.epoch, name: r.name };
+			return this.ok();
+		}
 		case 11: {
 			const at = this.rows.findIndex((r) => r && r.norad === u32le(p, 1));
 			if (at < 0) return this.status(4);

@@ -54,6 +54,33 @@ test("a satellite the radio knows is stored with its own profile", async () => {
 	assert.ok(text.length);
 });
 
+test("a profile the page has is written for a satellite that is new, ahead of the radio's own", async () => {
+	const r = new FakeRadio();
+	const tles = parse(V.text);
+	const mine = { norad: 27607, name: "SO-50", up_hz: 145850000, down_hz: 436795000, up_tone: 670, arm_tone: 744, arm_ms: 2000, armed_s: 600 };
+	const got = await sat.update(link(r), tles, { add: [27607, 25544], now: NOW, profile: (n) => (n === 27607 ? mine : null) });
+	const so = rowsOf(r).find((x) => x.norad === 27607);
+	assert.deepEqual([so.up_hz, so.down_hz, so.up_tone, so.arm_tone, so.arm_ms, so.armed_s, so.name], [145850000, 436795000, 670, 744, 2000, 600, "SO-50"]);
+	assert.match(got.find((x) => x.norad === 27607).detail, /with its frequencies/);
+	assert.equal(rowsOf(r).find((x) => x.norad === 25544).up_hz, 145990000, "one with no profile of the page's gets the radio's own");
+});
+
+test("a satellite held with no frequencies gets them, the elements as they are; one with frequencies keeps them", async () => {
+	const tles = parse(V.text);
+	const empty = { up_hz: 0, down_hz: 0, up_tone: 0, arm_tone: 0, arm_ms: 0, armed_s: 0 };
+	const r = new FakeRadio({ store: [{ norad: 25544, elements: true, epoch: Math.round(tles.get(25544).epoch), ...empty, name: "ISS" },
+		{ norad: 27607, elements: true, epoch: Math.round(tles.get(27607).epoch), up_hz: 145999000, down_hz: 436795000, up_tone: 0, arm_tone: 0, arm_ms: 0, armed_s: 0, name: "MINE" }] });
+	const prof = (n) => ({ norad: n, name: n === 25544 ? "ISS" : "SO-50", up_hz: 145990000, down_hz: 437800000, up_tone: 670, arm_tone: 0, arm_ms: 0, armed_s: 0 });
+	const got = await sat.update(link(r), tles, { now: NOW, profile: prof });
+	const iss = rowsOf(r).find((x) => x.norad === 25544), so = rowsOf(r).find((x) => x.norad === 27607);
+	assert.equal(got.find((x) => x.norad === 25544).outcome, "updated");
+	assert.deepEqual([iss.up_hz, iss.down_hz, iss.up_tone, iss.name], [145990000, 437800000, 670, "ISS"]);
+	assert.equal(iss.epoch, Math.round(tles.get(25544).epoch), "its elements are as they were");
+	assert.equal(r.calls.filter((c) => c.op === 1).length, 0, "no set was loaded for it");
+	assert.equal(got.find((x) => x.norad === 27607).outcome, "current");
+	assert.deepEqual([so.up_hz, so.name], [145999000, "MINE"], "the owner's profile stays");
+});
+
 test("choose: only the chosen satellites are loaded", async () => {
 	const r = new FakeRadio({ store: V.store });
 	const got = await sat.update(link(r), parse(V.text), { choose: new Set([27607]), now: NOW });

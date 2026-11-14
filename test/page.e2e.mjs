@@ -86,7 +86,7 @@ assert.equal(await page.locator("#sets-list .item").count(), 1);
 await page.uncheck("#only-picked");
 // the preview, before any radio
 await page.click("#preview summary");
-assert.match(await text("#preview-list"), /RS-44.*inclination 82\.5°, period 113\.4 min, height about 13\d\d km.*stored, with no frequencies/s);
+assert.match(await text("#preview-list"), /RS-44.*inclination 82\.5°, period 113\.4 min, height about 13\d\d km.*no frequencies known/s);
 
 // by sound, with no radio: the chosen set as audio (a download), and played and stopped
 assert.match(await text("#sound-info"), /1 chosen: about \d+ seconds, every satellite sent twice/);

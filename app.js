@@ -8,6 +8,7 @@ import { SerialStream, errorText, serialSupported } from "./lib/serial.js";
 import * as sat from "./lib/sat.js";
 import { fetchSets } from "./lib/source.js";
 import * as sound from "./lib/sound.js";
+import { PROFILES_SOURCE, describe, profileFor } from "./lib/profiles.js";
 import { compare, orbit, parse } from "./lib/tle.js";
 
 const $ = (id) => document.getElementById(id);
@@ -244,7 +245,17 @@ function stateOf(set, norad) {
 	return compare(set, stored.find((r) => r.norad === norad));
 }
 
+// What the frequencies of a satellite will be: the page's own profile (its source is in lib/profiles.js) goes to a satellite that
+// is new on the radio and fills in one held with none; a radio keeps the frequencies it already has
+function frequencyTag(n, known, rec) {
+	const p = profileFor(n);
+	if (known && rec && (rec.up_hz || rec.down_hz)) return tag("keeps the frequencies it has", "");
+	if (p) return tag(known ? `${rec ? "frequencies filled in" : "stored with"}: ${describe(p)}` : `sends ${describe(p)} (a radio keeps the frequencies it already has)`, "ok");
+	return tag(known ? "no frequencies known: stored by name only" : "no frequencies known for it", "warn");
+}
+
 function renderPreview() {
+	$("profile-source").textContent = `Frequencies: ${PROFILES_SOURCE.list}, checked against ${PROFILES_SOURCE.checked}. A satellite the radio already holds with frequencies keeps them.`;
 	const box = $("preview-list");
 	box.textContent = "";
 	const rows = [...picked].filter((n) => tles.has(n)).sort((a, b) => (tles.get(a).name || "").localeCompare(tles.get(b).name || ""));
@@ -264,7 +275,10 @@ function renderPreview() {
 		const meta = document.createElement("span");
 		meta.className = "meta";
 		meta.append(`set ${ageDays(set.epoch).toFixed(1)} days old, inclination ${o.incl.toFixed(1)}°, period ${o.period_min.toFixed(1)} min, height about ${Math.round(o.alt_km)} km   `);
-		meta.append(st === "new" ? tag("will be stored, with no frequencies", "warn") : st === "newer" ? tag("replaces an older set", "ok") : tag(st === "same" ? "already current: skipped" : "older than the radio's: skipped", ""));
+		// What the radio will do needs its list: without a connection nothing is said about the set, only about the frequencies
+		const known = !!(stored.length || link), rec = stored.find((r) => r.norad === n);
+		if (known) meta.append(st === "new" ? tag("new on the radio", "") : st === "newer" ? tag("replaces an older set", "ok") : tag(st === "same" ? "already current: skipped" : "older than the radio's: skipped", ""), " ");
+		meta.append(frequencyTag(n, known, rec));
 		item.append(name, meta);
 		box.append(item);
 	}
@@ -334,7 +348,7 @@ async function updateRadio() {
 		if (!picked.size) return;
 		const have = new Set(stored.map((r) => r.norad));
 		const results = (await sat.update(link, tles, {
-			add: [...picked].filter((n) => !have.has(n)), choose: new Set(picked),
+			add: [...picked].filter((n) => !have.has(n)), choose: new Set(picked), profile: profileFor,
 			onResult: (r) => { if (r.outcome !== "skipped") line(`${r.label} #${r.norad}: ${r.detail}`, r.outcome === "failed" ? "bad" : r.outcome === "updated" || r.outcome === "stored" ? "ok" : ""); },
 		})).filter((r) => r.outcome !== "skipped");
 		const n = results.filter((r) => r.outcome === "updated" || r.outcome === "stored").length;
@@ -408,7 +422,7 @@ async function diagnostics() {
 
 // Or by sound: the chosen sets, in the order the preview lists them, played at the radio's microphone or saved as a file
 function soundSets() {
-	return [...picked].filter((n) => tles.has(n)).map((n) => tles.get(n))
+	return [...picked].filter((n) => tles.has(n)).map((n) => ({ ...tles.get(n), profile: profileFor(n) }))
 		.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 }
 

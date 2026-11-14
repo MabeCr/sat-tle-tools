@@ -19,11 +19,15 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
    choose the cable. Satellites already on the radio whose data has a newer set are ticked for you. *Write to the radio*
    sets the clock too (the box is ticked by default; the radio refuses a time before 2026) and then stores the chosen
    satellites. It sends this device's time zone with the clock (daylight saving included, to the nearest 15 minutes), so the
-   radio's pass times are local; a radio whose firmware can't take the zone yet gets the clock alone and the page says so. A satellite that wasn't on the radio is stored with no frequencies.
+   radio's pass times are local; a radio whose firmware can't take the zone yet gets the clock alone and the page says so. A satellite that wasn't on the radio is stored with its **frequencies** (uplink, downlink, CTCSS tone and, for SO-50,
+   the arming carrier) when the page has them: the table in `lib/profiles.js`, from AMSAT's FM satellite list and checked against
+   SatNOGS DB. A satellite the radio already holds with no frequencies at all is filled in the same way; one that has any keeps
+   them, since you may have set them. A satellite the table doesn't have is stored by name only.
    **Or send by sound** (no cable): the page plays the satellites chosen in step 2 as an audio signal, so a phone's speaker
    held at the radio's microphone can carry them. *Play to the radio* plays it; *Download the audio (WAV)* saves it to play from
    any player. Each satellite is one frame of 1200 baud AFSK and the whole list is sent twice, about 90 seconds for 32.
-   It needs a radio whose firmware can receive it, which is still being written; the signal is specified in the firmware
+   The frequencies go in the same frames (a version 2 frame, 16 bytes more a satellite), under the same rule on the radio. It needs
+   a radio whose firmware can receive it (a satellite build with *Receive sound*); the signal is specified in the firmware
    repository's `docs/spec/sound-transfer.md`. Only the satellites you chose are sent, up to 32.
 4. **On the radio**: what the radio holds, read when you connect (so you can look before writing) and again after a
    write. *Delete* removes one.

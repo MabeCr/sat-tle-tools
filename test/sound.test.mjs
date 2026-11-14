@@ -3,15 +3,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { BAUD, GAP_MS, LEAD_MS, MARK_HZ, PREAMBLE_FLAGS, SPACE_HZ, buildFrame, cleanName, encode, fcs, frameTones, framesFor, hex, seconds, tleOk, tonesPacked, toWav } from "../lib/sound.js";
+import { BAUD, GAP_MS, LEAD_MS, MARK_HZ, PREAMBLE_FLAGS, PROFILE_KEYS, SPACE_HZ, buildFrame, cleanName, encode, fcs, frameTones, framesFor, hex, profileOk, seconds, tleOk, tonesPacked, toWav } from "../lib/sound.js";
 
 const V = JSON.parse(readFileSync(new URL("./sound_vectors.json", import.meta.url)));
+const profileOf = (v) => Object.fromEntries(PROFILE_KEYS.map((k) => [k, v[k]]));
 const ISS = { name: "ISS (ZARYA)", l1: V.good[0].line1, l2: V.good[0].line2 };
 const SO50 = { name: "SO-50", l1: V.good[1].line1, l2: V.good[1].line2 };
 
 test("frames and their HDLC tone bits are the ones the firmware's C code and the Python sender make", () => {
 	for (const g of V.good) {
-		const f = buildFrame(g.id, g.index, g.count, g.name, g.line1, g.line2);
+		const f = buildFrame(g.id, g.index, g.count, g.name, g.line1, g.line2, profileOf(g));
 		assert.equal(hex(f), g.frame_hex, g.name);
 		const tones = frameTones(f, 4, 2);
 		assert.equal(tones.length, g.tone_bits);
@@ -20,8 +21,19 @@ test("frames and their HDLC tone bits are the ones the firmware's C code and the
 });
 
 test("what no encoder may build a frame for is refused", () => {
-	for (const r of V.refused) assert.equal(buildFrame(r.id, r.index, r.count, r.name, r.line1, r.line2), null, r.why);
+	for (const r of V.refused) assert.equal(buildFrame(r.id, r.index, r.count, r.name, r.line1, r.line2, profileOf(r)), null, r.why);
 	assert.equal(buildFrame(1, 0, 1, "café", ISS.l1, ISS.l2), null, "a name outside printable ASCII");
+});
+
+test("a profile makes a version 2 frame, and a frame sent without one stays version 1", () => {
+	const so = V.good.find((g) => g.arm_tone), plain = V.good[0];
+	const f = buildFrame(so.id, so.index, so.count, so.name, so.line1, so.line2, profileOf(so));
+	assert.equal(f[1], 2);
+	assert.equal(f.length, 6 + so.name.length + 138 + 16);
+	assert.equal(buildFrame(1, 0, 1, "ISS", plain.line1, plain.line2)[1], 1);
+	assert.equal(buildFrame(1, 0, 1, "ISS", plain.line1, plain.line2, profileOf({ up_hz: 0, down_hz: 0, up_tone: 0, arm_tone: 0, arm_ms: 0, armed_s: 0 }))[1], 1);
+	assert.equal(buildFrame(1, 0, 1, "X", plain.line1, plain.line2, { ...profileOf(so), up_hz: 99999999 }), null);
+	assert.ok(profileOk(profileOf(so)) && !profileOk({ ...profileOf(so), arm_ms: 10001 }) && !profileOk({ ...profileOf(so), up_tone: 599 }));
 });
 
 test("the FCS is the HDLC one", () => {

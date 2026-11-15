@@ -15,7 +15,7 @@
 <body>
 <header>
 	<h1>Satellite TLE tool</h1>
-	<p class="lead">Pick the satellites you want, then write their orbit data and the time to the radio over the programming cable.</p>
+	<p class="lead">Pick the satellites you want, then write their orbit data and the time to the radio over the programming cable, or send the orbit data by sound.</p>
 </header>
 <main>
 <p id="unsupported" class="notice warn" hidden>This browser can't talk to a serial port. Use Chrome or Edge, on a computer or on an Android phone with the cable on an OTG adapter.</p>
@@ -46,7 +46,7 @@
 	<h2>2. Choose satellites</h2>
 	<p class="muted">Tick the satellites to write. The radio holds 32.</p>
 	<div class="row"><label>Search <input id="filter" type="search" placeholder="name or catalog number" autocomplete="off"></label></div>
-	<div class="row"><label class="inline"><input type="checkbox" id="only-picked"> Show only the chosen</label><button id="clear-btn">Clear choices</button></div>
+	<div class="row center"><label class="inline"><input type="checkbox" id="only-picked"> Show only the chosen</label><button id="clear-btn">Clear choices</button></div>
 	<p id="count" class="muted" role="status"></p>
 	<div id="sets-list" class="pick"></div>
 	<details id="preview">

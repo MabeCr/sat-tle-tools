@@ -195,19 +195,47 @@ function useText(text, from) {
 	renderSets();
 }
 
-async function download(force) {
-	let cached = null;
-	try { cached = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { /* none */ }
-	if (cached && !force && Date.now() - cached.t < CACHE_MS) {
-		useText(cached.text, `kept from ${Math.round((Date.now() - cached.t) / 60000)} minutes ago`);
+const kept = () => { try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch { return null; } };
+
+// How long ago a kept copy was taken, as a person says it
+function ageText(ms) {
+	const m = Math.max(0, Math.round(ms / 60000));
+	return m < 90 ? `${m} minutes ago` : m < 2880 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
+}
+
+// The page never downloads by itself: CelesTrak asks for its groups no more often than every two hours, and a page that
+// fetched at every visit could get a visitor refused. Opening it uses the copy kept in this browser, if there is one
+function showKept() {
+	const c = kept();
+	if (!c?.text) {
+		say($("src-msg"), "Press Download to get the element sets, or paste them or choose a file.");
 		return;
 	}
+	useText(c.text, `kept from ${ageText(Date.now() - c.t)}`);
+	if (Date.now() - c.t >= CACHE_MS) say($("src-msg"), `${$("src-msg").textContent} Press Download for newer ones.`);
+	$("net-btn").textContent = "Download again";
+}
+
+let askedFresh = false;	// the kept copy is under two hours old and the button was pressed once
+
+// The Download button. Within two hours of the last download the first press keeps the copy and says so; a second press
+// downloads anyway
+async function download() {
+	const cached = kept();
+	if (cached?.text && Date.now() - cached.t < CACHE_MS && !askedFresh) {
+		askedFresh = true;
+		useText(cached.text, `kept from ${ageText(Date.now() - cached.t)}`);
+		say($("src-msg"), `${$("src-msg").textContent} CelesTrak updates about every two hours: press Download again to download anyway.`);
+		$("net-btn").textContent = "Download anyway";
+		return;
+	}
+	askedFresh = false;
 	say($("src-msg"), "Downloading…");
 	let got;
 	try {
 		got = await fetchSets();
 	} catch (e) {
-		if (cached) {
+		if (cached?.text) {
 			useText(cached.text, "the last download: this one failed");
 			return;
 		}
@@ -224,6 +252,7 @@ async function download(force) {
 		old = h !== null && h > 36;
 	}
 	try { localStorage.setItem(CACHE_KEY, JSON.stringify({ t: Date.now(), text })); } catch { /* full or private */ }
+	$("net-btn").textContent = "Download again";
 	useText(text, from);
 	if (old) say($("src-msg"), `${$("src-msg").textContent} The copy is old: check the sets' ages below.`, "warn");
 }
@@ -491,7 +520,7 @@ function init() {
 	$("clock-btn").addEventListener("click", (e) => run(e.target, $("clock-msg"), setClock));
 	$("stored-btn").addEventListener("click", (e) => run(e.target, $("radio-info"), readStored));
 	for (const b of document.querySelectorAll(".tabs button")) b.addEventListener("click", () => setSource(b.dataset.src));
-	$("net-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), () => download(true)));
+	$("net-btn").addEventListener("click", (e) => run(e.target, $("src-msg"), download));
 	$("paste-btn").addEventListener("click", () => useText($("paste-text").value, "pasted"));
 	$("file-in").addEventListener("change", async (e) => {
 		const f = e.target.files[0];
@@ -516,7 +545,7 @@ function init() {
 	navigator.serial?.addEventListener("disconnect", () => { if (link) disconnect(); });
 	navigator.usb?.addEventListener("disconnect", () => { if (link && how === "usb") disconnect(); });
 	renderSets();
-	download(false);	// a radio isn't needed to see what there is to choose from
+	showKept();	// no download until the button is pressed; a radio isn't needed to see what there is to choose from
 	if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 

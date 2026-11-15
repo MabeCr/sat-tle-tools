@@ -22,15 +22,15 @@
 
 <section id="source">
 	<h2>1. Get element sets</h2>
-	<p class="muted">Element sets (TLEs) are the orbit data the radio needs. They are downloaded from CelesTrak's amateur radio group when this page opens: no radio is needed for the first two steps.</p>
+	<p class="muted">Element sets (TLEs) are the orbit data the radio needs. They are downloaded from CelesTrak's amateur radio group when you press <strong>Download</strong>; the page never downloads by itself. No radio is needed for the first two steps.</p>
 	<div class="tabs" role="tablist">
 		<button role="tab" data-src="net" aria-selected="true">Download</button>
 		<button role="tab" data-src="paste" aria-selected="false">Paste</button>
 		<button role="tab" data-src="file" aria-selected="false">File</button>
 	</div>
 	<div id="src-net" class="src">
-		<p class="muted">Sets are kept in this browser; the page repeats the download no sooner than every two hours unless you ask.</p>
-		<div class="row"><button id="net-btn">Download again</button></div>
+		<p class="muted">Sets are kept in this browser, and the page opens with the copy it kept. CelesTrak asks for its groups no more often than every two hours, so a press within two hours of the last download keeps the copy and asks you to press again.</p>
+		<div class="row"><button id="net-btn">Download</button></div>
 	</div>
 	<div id="src-paste" class="src" hidden>
 		<textarea id="paste-text" rows="6" spellcheck="false" placeholder="ISS (ZARYA)&#10;1 25544U 98067A ...&#10;2 25544 ..."></textarea>

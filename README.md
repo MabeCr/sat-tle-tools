@@ -10,8 +10,9 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 
 ### Use it
 
-1. Open the page (see "Publish it" below). It downloads CelesTrak's amateur radio element sets at once (kept in the
-   browser and not repeated within two hours; **Paste** and **File** are the fallbacks). No radio is needed yet.
+1. Open the page (see "Publish it" below). Press **Download** to get CelesTrak's amateur radio element sets: the page never downloads by itself, so a visit can't get you refused for asking too often (kept in the
+   browser: the page opens with the copy it kept, and a press within two hours of the last download keeps that copy and asks
+   you to press again; **Paste** and **File** are the fallbacks). No radio is needed yet.
 2. **Choose satellites**: every set read is listed, with a search box and a check box each. The page counts the radio's
    32 places. *Preview what will be written* shows each chosen satellite's data age, inclination, period and height,
    and whether it is new on the radio, replaces an older set or is already current.

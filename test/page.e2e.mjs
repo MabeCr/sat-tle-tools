@@ -59,15 +59,26 @@ await page.addInitScript(() => {
 });
 const SETS = JSON.parse(await readFile(join(ROOT, "test/vectors.json"), "utf8")).text;
 const celestrak = (route) => route.fulfill({ status: 200, contentType: "text/plain", body: SETS });
-await page.route("https://celestrak.org/**", celestrak);
+const asked = [];	// every request to CelesTrak or this site's copy of its data
+await page.route("https://celestrak.org/**", (r) => { asked.push(r.request().url()); return celestrak(r); });
+await page.route("**/tle/amateur.txt", (r) => { asked.push(r.request().url()); return celestrak(r); });
 await page.goto(url);
 await page.evaluate(() => window.__ready);
 const text = (sel) => page.locator(sel).innerText();
 
 assert.equal(await page.locator("#unsupported").isHidden(), true);
 
-// 1 and 2 need no radio: the sets download when the page opens and every one is listed to choose from
+// Nothing downloads when the page opens (CelesTrak asks for its groups no more often than every two hours): the button asks
+await page.waitForTimeout(500);
+assert.deepEqual(asked, []);
+assert.equal(await page.locator("#sets-list .item").count(), 0);
+assert.match(await text("#src-msg"), /Press Download/);
+assert.equal(await text("#net-btn"), "Download");
+// 1 and 2 need no radio: the sets download when the button is pressed and every one is listed to choose from
+await page.click("#net-btn");
 await page.waitForSelector("#sets-list .item");
+assert.equal(asked.length, 1);
+assert.equal(await text("#net-btn"), "Download again");
 assert.match(await text("#src-msg"), /3 element sets read/);
 assert.equal(await page.locator("#sets-list .item").count(), 3);
 assert.equal(await page.locator("#sets-list input:checked").count(), 0);
@@ -87,6 +98,24 @@ await page.uncheck("#only-picked");
 // the preview, before any radio
 await page.click("#preview summary");
 assert.match(await text("#preview-list"), /RS-44.*inclination 82\.5°, period 113\.4 min, height about 13\d\d km.*no frequencies known/s);
+
+// the copy is kept: opening the page again uses it with no request, and a press within two hours asks before downloading again
+await page.reload();
+await page.evaluate(() => window.__ready);
+await page.waitForSelector("#sets-list .item");
+assert.match(await text("#src-msg"), /3 element sets read \(kept from \d+ minutes ago\)/);
+assert.equal(asked.length, 1, "opening the page again made no request");
+await page.click("#net-btn");
+assert.match(await text("#src-msg"), /kept from .*press Download again to download anyway/);
+assert.equal(await text("#net-btn"), "Download anyway");
+assert.equal(asked.length, 1, "the first press within two hours made no request");
+await page.click("#net-btn");
+await page.waitForFunction(() => /downloaded now/.test(document.getElementById("src-msg").textContent));
+assert.equal(asked.length, 2, "the second press downloads");
+// choose again for what follows
+await page.fill("#filter", "44909");
+await page.check("#sets-list input");
+await page.fill("#filter", "");
 
 // by sound, with no radio: the chosen set as audio (a download), and played and stopped
 assert.match(await text("#sound-info"), /1 chosen: about \d+ seconds, every satellite sent twice/);
@@ -227,6 +256,7 @@ assert.deepEqual(errors, []);
 	await fb.route("**/tle/mirror.json", (r) => r.fulfill({ status: 200, contentType: "application/json",
 		body: JSON.stringify({ fetched: new Date(Date.now() - 3 * 3600e3).toISOString(), source: "AMSAT" }) }));
 	await fb.goto(url);
+	await fb.click("#net-btn");
 	await fb.waitForSelector("#sets-list .item");
 	assert.match(await fb.locator("#src-msg").innerText(), /3 element sets read \(CelesTrak could not be reached: this site's copy from AMSAT, taken 3 hours ago\)/);
 	await fb.close();
@@ -234,6 +264,7 @@ assert.deepEqual(errors, []);
 	await none.route("https://celestrak.org/**", (r) => r.abort());
 	await none.route("**/tle/amateur.txt", (r) => r.fulfill({ status: 404, body: "not found" }));
 	await none.goto(url);
+	await none.click("#net-btn");
 	await none.waitForFunction(() => /Couldn't download/.test(document.getElementById("src-msg").textContent));
 	const msg = await none.locator("#src-msg").innerText();
 	assert.match(msg, /CelesTrak: .*; this site's copy: the server answered 404/);

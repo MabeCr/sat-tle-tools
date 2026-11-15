@@ -12,7 +12,7 @@ tracking (`SAT` in the features list of its `version`). Plain files, no build st
 
 1. Open the page (see "Publish it" below). Press **Download** to get CelesTrak's amateur radio element sets: the page never downloads by itself, so a visit can't get you refused for asking too often (kept in the
    browser: the page opens with the copy it kept, and a press within two hours of the last download keeps that copy and asks
-   you to press again; **Paste** and **File** are the fallbacks). No radio is needed yet.
+   you to press again; **Paste TLEs** and **Upload TLE file** are the fallbacks). No radio is needed yet.
 2. **Choose satellites**: every set read is listed, with a search box and a check box each. The page counts the radio's
    32 places. *Preview what will be written* shows each chosen satellite's data age, inclination, period and height,
    and whether it is new on the radio, replaces an older set or is already current.
@@ -46,7 +46,7 @@ CelesTrak's amateur group every six hours from GitHub's servers, checks that it 
 If CelesTrak can't be reached it takes [AMSAT's list](https://www.amsat.org/tle/current/nasabare.txt) instead (AMSAT sends no
 cross-origin header, so a browser page can't read it directly, but the Action can). When neither works, the copy that is
 there stays. Run it by hand from the repository's Actions tab (*tle-mirror*, *Run workflow*), for example after
-turning this on the first time. The page still keeps the last download in the browser, and Paste and File still work. To add
+turning this on the first time. The page still keeps the last download in the browser, and Paste TLEs and Upload TLE file still work. To add
 another source, add it to `SAT_TLE_SOURCES` in `lib/source.js` (a host that allows cross-origin requests from the page).
 
 **Connecting from a phone.** Chrome on Android gives Web Serial only to USB devices of the standard serial class (and to

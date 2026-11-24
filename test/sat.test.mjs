@@ -24,6 +24,37 @@ test("version and the sat view", async () => {
 	assert.deepEqual((await sat.list(l)).map((x) => [x.slot, x.norad, x.name]), [[0, 25544, "ISS"], [1, 27607, "SO-50"], [2, 43017, "AO-91"]]);
 });
 
+test("the satellite command and view from VERSION: a firmware that moved them says where", async () => {
+	const r = new FakeRadio({ store: V.store, numbers: "new" });
+	const l = link(r);
+	// Before VERSION the page would ask with the old numbers: this firmware has nothing there, so the list is empty
+	assert.deepEqual(await sat.list(l), []);
+	const v = await l.version();
+	assert.equal(v.satcmd, "48");
+	assert.equal(v.satview, "39");
+	assert.equal(l.satCmd, 0x30);
+	assert.equal((await l.view("sat")).kv["sat.slots"], "32");
+	assert.deepEqual((await sat.list(l)).map((x) => [x.slot, x.norad]), [[0, 25544], [1, 27607], [2, 43017]]);
+	assert.equal((await l.view("tasks")).kv["tasks.count"], "10", "the other sections keep their numbers");
+});
+
+test("a firmware from before the move (no satcmd in VERSION) keeps 0x20 and section 28", async () => {
+	const r = new FakeRadio({ store: V.store, numbers: "old" });
+	const l = link(r);
+	const v = await l.version();
+	assert.equal(v.satcmd, undefined);
+	assert.equal(l.satCmd, 0x20);
+	assert.equal((await l.view("sat")).kv["sat.slots"], "32");
+	assert.equal((await sat.list(l)).length, 3);
+});
+
+test("nonsense satellite numbers in VERSION are ignored", async () => {
+	const l = link(new FakeRadio());
+	l.adopt({ satcmd: "x", satview: "999" });
+	assert.equal(l.satCmd, 0x20);
+	assert.equal(l.sections.sat, 28);
+});
+
 for (const [name, key] of [["update", "update"], ["dry run", "dry_run"]]) {
 	test(`${name}: the same outcomes and the same stored rows as the host tool`, async () => {
 		const run = V.runs[key];

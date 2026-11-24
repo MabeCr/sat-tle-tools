@@ -15,7 +15,12 @@ const PROFILES = {	// the radio's own profiles (core/sat/sat_profile.c): the one
 };
 
 export class FakeRadio {
-	constructor({ slots = 32, sat = true, store = [], clock = 1793196300, noZone = false } = {}) {
+	// numbers: "new", the firmware with upstream's satellite feature beside ours (command 0x30, view 39, said in VERSION),
+	// or "old", the firmware before it (command 0x20, view 28, not said)
+	constructor({ slots = 32, sat = true, store = [], clock = 1793196300, noZone = false, numbers = "old" } = {}) {
+		this.satCmd = numbers === "new" ? 0x30 : 0x20;
+		this.satView = numbers === "new" ? 39 : 28;
+		this.numbers = numbers;
 		this.buf = new Uint8Array(0);
 		this.slots = slots;
 		this.sat = sat;
@@ -46,14 +51,15 @@ export class FakeRadio {
 	status(n) { return new Uint8Array([n]); }
 
 	answer(cmd, p) {
-		if (cmd === 0x02) return this.ok(ascii(`board=FAKE\nrelease=test\nfeatures=FM,DMR,DEBUGLINK,HOSTLINK${this.sat ? ",SAT" : ""},CPS_FAST\n`));
+		if (cmd === 0x02) return this.ok(ascii(`board=FAKE\nrelease=test\nfeatures=FM,DMR,DEBUGLINK,HOSTLINK${this.sat ? ",SAT" : ""},CPS_FAST\n` +
+			(this.numbers === "new" ? `satcmd=${this.satCmd}\nsatview=${this.satView}\n` : "")));
 		if (cmd === 0x09) return this.viewAnswer(p[0]);
-		if (cmd === 0x20) return this.sat ? this.satAnswer(p) : this.status(4);
+		if (cmd === this.satCmd) return this.sat ? this.satAnswer(p) : this.status(4);
 		return this.status(4);
 	}
 
 	viewAnswer(i) {
-		const kv = i === 28 && !this.sat ? "section=sat\nsat.built=0\n" : i === 28 ? `section=sat\nsat.built=1\nsat.store=ours\nsat.slots=${this.slots}\nsat.stored=${this.rows.filter(Boolean).length}\nsat.profile=${this.loaded && PROFILES[this.loaded.norad] ? this.loaded.norad : "-"}\n`
+		const kv = i === this.satView && !this.sat ? "section=sat\nsat.built=0\n" : i === this.satView ? `section=sat\nsat.built=1\nsat.store=ours\nsat.slots=${this.slots}\nsat.stored=${this.rows.filter(Boolean).length}\nsat.profile=${this.loaded && PROFILES[this.loaded.norad] ? this.loaded.norad : "-"}\n`
 			: i === 20 ? "section=tasks\ntasks.count=10\ntasks.min_free=452\ntasks.min_task=IDLE\ntasks.heap_free=15416\ntasks.heap_min_free=15416\n"
 			: i === 21 ? (this.crash ? "section=crash\ncrash.built=1\ncrash.valid=1\ncrash.kind=5\ncrash.task=ui\n" : "section=crash\ncrash.built=1\ncrash.valid=0\n")
 			: `section=x${i}\n`;

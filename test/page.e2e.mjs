@@ -37,7 +37,7 @@ await page.addInitScript(() => {
 	window.__ready = (async () => {
 		const { FakeRadio } = await import("/test/fakeradio.js");
 		const V = await (await fetch("/test/vectors.json")).json();
-		const radio = new FakeRadio({ store: V.store, clock: 0 });
+		const radio = new FakeRadio({ store: V.store, clock: 0, numbers: "new" });
 		window.__radio = radio;
 		window.__vectors = V;
 		const port = {
@@ -219,7 +219,7 @@ assert.deepEqual(errors, []);
 			const { FakeRadio } = await import("/test/fakeradio.js");
 			const { FakeFtdi } = await import("/test/fakeftdi.js");
 			const V = await (await fetch("/test/vectors.json")).json();
-			const radio = new FakeRadio({ store: V.store, clock: 0 });
+			const radio = new FakeRadio({ store: V.store, clock: 0, numbers: "new" });
 			const dev = new FakeFtdi(radio);
 			window.__radio = radio;
 			window.__dev = dev;
